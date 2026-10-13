@@ -1,6 +1,6 @@
 # Pi Tin mod
 
-Personal build of jackw01's [Pi Tin](https://github.com/jackw01/pi-tin) (3D-printed clamshell version, KiCad 10). It adds 10 RGB LEDs under the buttons, a centred speaker, a USB-drive mode for the SD card, and ESD protection on USB. The main board is the "everything on the back" variant. The upstream [build guides](https://jackw01.github.io/pi-tin/) still apply. License: CERN-OHL-W v2.
+Personal build of jackw01's [Pi Tin](https://github.com/jackw01/pi-tin) (3D-printed clamshell version, KiCad 10). It adds 10 RGB LEDs under the buttons, a centred speaker, a USB-drive mode for the SD card, and ESD protection on USB. The upstream [build guides](https://jackw01.github.io/pi-tin/) still apply. License: CERN-OHL-W v2.
 
 ## Boards
 
