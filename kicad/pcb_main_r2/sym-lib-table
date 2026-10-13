@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "pitin_extra")(type "KiCad")(uri "${KIPRJMOD}/pitin_extra.kicad_sym")(options "")(descr "Pi Tin mod: USBLC6-2SC6, 74AHCT1G125"))
+)

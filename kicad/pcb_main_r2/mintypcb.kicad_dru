@@ -1,0 +1,7 @@
+(version 1)
+(rule "J101 shell tabs: also tied to GND by tracks, one spoke is enough"
+	(condition "A.memberOfFootprint('J101')")
+	(constraint min_resolved_spokes 1))
+(rule "TP133 is a bare wire pad: courtyard may touch C120"
+	(condition "A.Reference == 'TP133' || B.Reference == 'TP133'")
+	(constraint courtyard_clearance (min -1mm)))

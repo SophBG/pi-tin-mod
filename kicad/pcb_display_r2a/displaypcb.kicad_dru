@@ -1,0 +1,4 @@
+(version 1)
+(rule "JP102 is a bare solder jumper: courtyard may touch J102 (as upstream)"
+	(condition "A.Reference == 'JP102' || B.Reference == 'JP102'")
+	(constraint courtyard_clearance (min -1mm)))

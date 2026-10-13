@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "pitin_extra")(type "KiCad")(uri "${KIPRJMOD}/pitin_extra.pretty")(options "")(descr "Pi Tin mod: footprints that accept LCSC and Mouser/DigiKey parts"))
+)

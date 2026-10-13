@@ -1,0 +1,12 @@
+// Only needed if /dev/spidev0.1 does not appear (some display overlays disable spidev1).
+// Build:  dtc -@ -I dts -O dtb -o spidev1-on.dtbo spidev1-on.dts && sudo cp spidev1-on.dtbo /boot/overlays/
+// Then add  dtoverlay=spidev1-on  AFTER the display and spi0-2cs lines in config.txt.
+/dts-v1/;
+/plugin/;
+/ {
+	compatible = "brcm,bcm2835";
+	fragment@0 {
+		target = <&spidev1>;
+		__overlay__ { status = "okay"; };
+	};
+};
