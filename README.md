@@ -7,8 +7,6 @@ A modified [Pi Tin](https://github.com/jackw01/pi-tin) handheld (KiCad 10), with
 - ESD protection on the USB data lines;
 - connector footprints that accept both the LCSC parts and the Mouser/DigiKey parts.
 
-The main board is the **"everything on the back" variant**: all new parts are on the back side; only the LEDs, the buttons and the original charge LEDs are on the front.
-
 Original design by jackw01 (alley cat engineering). Hardware license: CERN-OHL-W v2.
 
 ## What is in this zip
@@ -72,23 +70,6 @@ Original design by jackw01 (alley cat engineering). Hardware license: CERN-OHL-W
 | J103 (display), 50-pin FPC | JUSHUO AFC07-S50ECA-00 | Amphenol F32Q-1A7H1-11050 | None needed. |
 
 KiCad's DRC was run before and after the change, with zones refilled: no new violations.
-
-## DRC
-
-### What was fixed on the main board
-
-| Problem | Fix |
-|---|---|
-| The USB_PWR track (front) passed 0.55 mm from the H106 mounting hole. | It now goes around the hole, at least 1.2 mm from its edge. |
-| R131 and the LED_CS via sat inside the H106 keep-out. | R131 moved to the free area left of the hole, with a new via and a new front track. Its 3.3 V feed was rerouted. |
-| The LED_CS track ran across the FB103/FB104 copper bridges, which shorted it to both speaker outputs. | Rerouted above the C110 / FB103 / FB104 / C111 row. |
-| R130 and R132 sat under the SW111 shoulder button. | Moved into the free space next to it and turned 90°, with LED_BUF and LED_DIN rerouted. The 5 V copper area on the back stays in one piece. |
-| R133 sat under the USB-C connector body. | Moved next to the connector, with VBUS and USB_PWR rerouted. |
-| The USB-C GND pins A1/B12 were not joined to the GND plane. | Two short back-side tracks. |
-| D8 and SW116 had too few thermal-relief spokes to GND. | Their GND pads now connect solidly to the plane. R132's GND pad too: its spokes left a 0.11 mm neck of copper. |
-| TP132 and TP133 overlapped other parts. | Moved to free spots. TP133 still touches C120's courtyard (see below). |
-
-Display board: the WEEE logo was flagged as a part missing from the schematic. It is now marked "board only".
 
 ### Final result
 
