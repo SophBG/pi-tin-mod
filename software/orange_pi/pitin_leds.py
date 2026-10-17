@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""Pi Tin RGB LEDs (10x WS2812B-2020) through the 74AHCT1G125 gate on header pin 21.
+
+The buffer only passes MOSI while the second chip select (pin 21) is low, so the display
+on the first chip select never reaches the LEDs. On the Orange Pi the LEDs are
+/dev/spidevN.1 (pitin-opi-zero2w overlay: CS1 = PH8 as GPIO).
+Set PITIN_LED_SPIDEV=/dev/spidevB.D to force a device.
+
+Each WS2812 bit is sent as one SPI byte:
+    '0' -> 0b11000000 (~0.32 us high)    '1' -> 0b11111000 (~0.80 us high)
+at about 6.25 MHz (160 ns per SPI bit, 1.28 us per LED bit). Anything from 5.3 to 8.6 MHz
+keeps both pulse widths inside the WS2812B timing. The reset/latch (>280 us low) happens
+by itself: when the chip select goes high the buffer turns off and R132 holds the LED
+data line low.
+
+Usage:  pitin_leds.py demo | off | set R G B
+"""
+import glob, os, re, sys, time, spidev
+
+N_LEDS = 10
+# The data goes D1 -> D2 -> ... -> D10 (index 0 receives the data first).
+CHAIN = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10']
+# D1-D4: ABXY corners (top left, top right, bottom right, bottom left)   D5: Start   D6: Select
+# D7-D10: D-pad corners (bottom right, bottom left, top left, top right)
+BRIGHTNESS = 0.25          # keep it low: 10 LEDs at full white draw ~0.5 A
+
+_LUT = [bytes(0xF8 if (v >> (7 - i)) & 1 else 0xC0 for i in range(8)) for v in range(256)]
+
+def find_spidev():
+    """(bus, dev) of the LED spidev: PITIN_LED_SPIDEV, else the first /dev/spidev*.1."""
+    path = os.environ.get('PITIN_LED_SPIDEV') or next(iter(sorted(glob.glob('/dev/spidev*.1'))), None)
+    m = re.fullmatch(r'/dev/spidev(\d+)\.(\d+)', path or '')
+    if not m:
+        sys.exit('pitin_leds: no /dev/spidev*.1 found (is the SPI overlay loaded?)')
+    return int(m.group(1)), int(m.group(2))
+
+class Leds:
+    def __init__(self, hz=6_400_000):
+        bus, dev = find_spidev()
+        self.spi = spidev.SpiDev()
+        self.spi.open(bus, dev)
+        self.spi.mode = 0
+        self.spi.max_speed_hz = hz
+    def show(self, colors):
+        buf = bytearray(b'\x00' * 2)     # short idle-low lead-in
+        for r, g, b in colors:
+            for c in (g, r, b):          # WS2812 order is GRB
+                buf += _LUT[max(0, min(255, int(c * BRIGHTNESS)))]
+        buf += b'\x00' * 2
+        self.spi.writebytes2(buf)
+        time.sleep(0.0003)               # latch
+    def show_by_ref(self, colors_by_ref, off=(0, 0, 0)):
+        """colors_by_ref: {'D7': (r, g, b), ...} using the PCB reference of each LED."""
+        self.show([colors_by_ref.get(ref, off) for ref in CHAIN])
+    def off(self):
+        self.show([(0, 0, 0)] * N_LEDS)
+
+def wheel(p):
+    p %= 255
+    if p < 85:  return (255 - p * 3, p * 3, 0)
+    if p < 170: p -= 85; return (0, 255 - p * 3, p * 3)
+    p -= 170;   return (p * 3, 0, 255 - p * 3)
+
+if __name__ == '__main__':
+    leds = Leds()
+    cmd = sys.argv[1] if len(sys.argv) > 1 else 'demo'
+    if cmd == 'off':
+        leds.off()
+    elif cmd == 'set':
+        r, g, b = (int(x) for x in sys.argv[2:5])
+        leds.show([(r, g, b)] * N_LEDS)
+    else:
+        try:
+            t = 0
+            while True:
+                leds.show([wheel(t + i * 25) for i in range(N_LEDS)])
+                t += 3; time.sleep(0.03)
+        except KeyboardInterrupt:
+            leds.off()

@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pi Tin</title>
+<style>
+/* One column on a phone, two on a computer. The console drawing uses the real faceplate and LED
+   positions; the page stays monochrome so the only colour on it is the lights'. */
+:root {
+  --bg: #eceef1; --card: #ffffff; --ink: #16191d; --muted: #5c636c; --line: #d6dae0;
+  --btn: #dfe3e8; --led-off: #c6ccd4; --warn: #b43c0a; --ok: #1f7a4d;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-num: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0f1113; --card: #181b1f; --ink: #eef1f4; --muted: #98a1ab; --line: #2a2f35;
+    --btn: #23272c; --led-off: #2c3137; --warn: #ff8a5c; --ok: #5fd39a; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #0f1113; --card: #181b1f; --ink: #eef1f4; --muted: #98a1ab; --line: #2a2f35;
+  --btn: #23272c; --led-off: #2c3137; --warn: #ff8a5c; --ok: #5fd39a; color-scheme: dark; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font-ui); -webkit-text-size-adjust: 100%; }
+main { max-width: 480px; margin: 0 auto; display: grid; gap: 12px; padding-block: 18px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 24px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+.top-right { display: flex; align-items: center; gap: 12px; }
+#status { font-size: 13px; color: var(--muted); text-align: right; }
+.bad { color: var(--warn) !important; }
+.good { color: var(--ok) !important; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
+h2 { font-size: 17px; font-weight: 650; margin: 0; }
+h3 { font-size: 14px; font-weight: 600; margin: 0; color: var(--muted); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hint { font-size: 14px; color: var(--muted); margin: 0; }
+button { font: inherit; color: inherit; }
+.btn { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 9px 14px; min-height: 42px; cursor: pointer; font-size: 15px; }
+.btn:hover { background: var(--btn); }
+.btn.solid { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.btn.danger { color: var(--warn); }
+.btn.armed { background: var(--warn); border-color: var(--warn); color: var(--card); }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.panel { display: grid; gap: 12px; min-width: 0; }
+
+/* tabs */
+nav { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--btn); border-radius: 12px; padding: 4px; gap: 4px; }
+nav button { border: 0; background: transparent; padding: 10px 0; border-radius: 9px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--muted); }
+nav button[aria-selected="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+
+/* console drawing */
+.console svg { width: 100%; height: auto; display: block; }
+.console .plate { fill: var(--btn); stroke: var(--line); stroke-width: .25; }
+.console .cap { fill: var(--card); stroke: var(--line); stroke-width: .25; }
+.console .arm { fill: transparent; cursor: pointer; }
+.console .arm:hover { fill: color-mix(in srgb, var(--ink) 8%, transparent); }
+.console .key { fill: var(--card); stroke: var(--line); stroke-width: .25; cursor: pointer; }
+.console .key:hover { fill: var(--line); }
+.console .lbl.big { font-size: 2.3px; }
+.console .lbl { fill: var(--muted); font: 600 1.5px var(--font-ui); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.console .led { fill: var(--led-off); stroke: var(--line); stroke-width: .2; }
+.console .hit { fill: transparent; cursor: pointer; }
+.console .ring { fill: none; stroke: var(--ink); stroke-width: .35; }
+.console .ord { fill: var(--ink); font: 700 2px var(--font-num); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+
+/* choices */
+.fx { display: grid; gap: 2px; }
+.fx label { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; padding: 9px 6px; border-radius: 10px; cursor: pointer; }
+.fx label:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.fx input { margin: 2px 0 0; accent-color: var(--ink); width: 20px; height: 20px; }
+.fx b { font-weight: 600; display: block; }
+.fx span { font-size: 14px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips button { border: 1px solid var(--line); background: var(--card); border-radius: 20px; padding: 8px 14px; min-height: 40px; font-size: 14px; cursor: pointer; }
+.chips button:hover { background: var(--btn); }
+.chips button[aria-pressed="true"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.row { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 12px; }
+.row > label { font-size: 15px; color: var(--muted); }
+input[type=range] { width: 100%; accent-color: var(--ink); height: 28px; }
+.val { font: 14px var(--font-num); min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* colours */
+.colours { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.sw { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--line); padding: 0; cursor: pointer; }
+.sw.on { outline: 2px solid var(--ink); outline-offset: 2px; }
+.pick { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 5px; border: 1px solid var(--line); border-radius: 20px; font-size: 14px; cursor: pointer; }
+.pick:hover { background: var(--btn); }
+.pick.on { outline: 2px solid var(--ink); outline-offset: 2px; }
+.pick i { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--card); background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+.pick input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* switch */
+.switch { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.switch input { position: relative; appearance: none; margin: 0; width: 50px; height: 30px; border-radius: 15px; background: var(--line); cursor: pointer; transition: background .15s; flex: none; }
+.switch input:checked { background: var(--ink); }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--card); transition: transform .15s; }
+.switch input:checked::after { transform: translateX(20px); }
+
+/* games */
+.meter { height: 8px; background: var(--btn); border-radius: 4px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--ink); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--btn); border-radius: 11px; padding: 4px; gap: 4px; }
+.seg button { border: 0; background: transparent; border-radius: 8px; padding: 9px 6px; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.dest { font-size: 14px; color: var(--muted); margin: 0; }
+.dest b { color: var(--ink); font-weight: 600; }
+.drop { border: 1.5px dashed var(--line); border-radius: 12px; padding: 20px 12px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.drop.over { border-color: var(--ink); background: var(--btn); }
+.drop .or { font-size: 14px; color: var(--muted); }
+@media (hover: none) { .drop .or { display: none; } }
+.choose { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.choose input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.ups { display: grid; }
+.up { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 9px 2px; border-top: 1px solid var(--line); }
+.up:first-child { border-top: 0; }
+.up .name { overflow-wrap: anywhere; }
+.up .to { font-size: 13px; color: var(--muted); display: flex; gap: 5px; align-items: center; min-width: 0; overflow-wrap: anywhere; }
+.up .state { grid-row: 1 / 3; grid-column: 2; align-self: center; font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.up progress { width: 70px; accent-color: var(--ink); }
+.up svg, .node svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linejoin: round; }
+.x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 6px 8px; border-radius: 8px; min-height: 36px; }
+.x:hover { background: var(--btn); }
+.x.armed { background: var(--warn); color: var(--card); }
+.tree { display: grid; font-size: 15px; }
+.node { display: grid; grid-template-columns: calc(var(--d, 0) * 16px) 12px 18px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 10px; min-height: 44px; }
+.node.folder { cursor: pointer; }
+.node.folder:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.node.sel { background: var(--btn); box-shadow: inset 3px 0 0 var(--ink); }
+.node .chev { color: var(--muted); font-size: 9px; text-align: center; transition: transform .12s; }
+.node.open .chev { transform: rotate(90deg); }
+.node.file svg { color: var(--muted); }
+.node .label { min-width: 0; overflow-wrap: anywhere; }
+.node .label b { font-weight: 600; }
+.node .label code { display: block; font: 12px var(--font-num); color: var(--muted); }
+.node .meta { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.node.fresh .label::after { content: attr(data-new); display: inline-block; white-space: nowrap; margin-left: 8px; font: 600 11px var(--font-ui); letter-spacing: .04em; text-transform: uppercase; color: var(--ok); }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 2px; }
+.newdir { display: flex; gap: 8px; }
+.newdir input { flex: 1 1 auto; width: 0; min-width: 0; font: inherit; font-size: 16px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
+
+/* console tab */
+dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: 15px; }
+dt { color: var(--muted); }
+dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+dl.keys dt { font: 14px var(--font-num); color: var(--ink); white-space: nowrap; }
+dl.keys dd { color: var(--muted); }
+
+/* a computer: two columns */
+@media (min-width: 900px) {
+  main { max-width: 1040px; }
+  #panel-leds, #panel-games, #panel-system { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+  #panel-leds > .console { grid-column: 1; grid-row: 1 / span 6; position: sticky; top: 16px; }
+  #panel-leds > section:not(.console) { grid-column: 2; }
+  #panel-games > .tree-card { grid-column: 2; grid-row: 1 / span 4; }
+  #panel-games > section:not(.tree-card) { grid-column: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .switch input, .switch input::after, .node .chev { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Pi Tin</h1>
+    <div class="top-right">
+      <span id="status" data-t="connecting"></span>
+    </div>
+  </header>
+  <nav role="tablist">
+    <button role="tab" id="tab-leds" aria-controls="panel-leds" aria-selected="true" data-t="tab_leds"></button>
+    <button role="tab" id="tab-games" aria-controls="panel-games" aria-selected="false" data-t="tab_games"></button>
+    <button role="tab" id="tab-system" aria-controls="panel-system" aria-selected="false" data-t="tab_system"></button>
+  </nav>
+
+  <!-- ===================================================== Lights -->
+  <div id="panel-leds" class="panel" role="tabpanel" aria-labelledby="tab-leds">
+    <section class="console">
+      <svg viewBox="47.5 47.2 92 59.6" role="img" data-t-aria="drawing">
+        <defs><filter id="glow" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="0.9"/></filter></defs>
+        <rect class="key" data-refs="D7 D8 D9 D10" x="61.5" y="48" width="10" height="2.6" rx="1.1"/><text class="lbl" x="66.5" y="49.3">L1</text>
+        <rect class="key" data-refs="D7 D8 D9 D10" x="73.5" y="48" width="10" height="2.6" rx="1.1"/><text class="lbl" x="78.5" y="49.3">L2</text>
+        <rect class="key" data-refs="D1 D2 D3 D4" x="103.5" y="48" width="10" height="2.6" rx="1.1"/><text class="lbl" x="108.5" y="49.3">R2</text>
+        <rect class="key" data-refs="D1 D2 D3 D4" x="115.5" y="48" width="10" height="2.6" rx="1.1"/><text class="lbl" x="120.5" y="49.3">R1</text>
+        <!-- faceplate front, sliced from faceplate_v3_with_led_pockets.stl -->
+        <path class="plate" fill-rule="evenodd" d="M49.10 81.05 L49.11 58.61 L49.22 58.24 L50.24 56.38 L51.55 54.72 L53.12 53.29 L54.89 52.14 L56.83 51.29 L58.89 50.77 L61.00 50.60 L85.80 50.60 L86.10 50.68 L86.32 50.90 L86.40 51.20 L86.40 52.37 L86.45 52.57 L86.74 53.08 L86.90 53.21 L87.13 53.29 L99.80 53.29 L100.04 53.24 L100.27 53.06 L100.56 52.54 L100.60 52.37 L100.60 51.20 L100.64 50.99 L100.83 50.73 L100.99 50.64 L101.20 50.60 L126.00 50.60 L128.11 50.77 L130.17 51.29 L130.64 51.50 L132.11 52.14 L133.88 53.29 L135.45 54.72 L136.76 56.38 L137.78 58.24 L137.90 58.81 L137.89 97.89 L137.78 98.26 L136.76 100.12 L135.45 101.78 L133.88 103.21 L132.11 104.36 L130.17 105.21 L128.11 105.73 L126.00 105.90 L61.00 105.90 L58.89 105.73 L56.83 105.21 L54.89 104.36 L53.12 103.21 L51.55 101.78 L50.24 100.12 L49.15 98.08 L49.10 97.69 L49.10 81.05 Z M71.60 58.05 L66.40 58.05 L66.10 58.13 L65.88 58.35 L65.80 58.65 L65.80 63.65 L65.71 63.91 L65.60 64.00 L65.40 64.05 L60.30 64.06 L60.01 64.19 L59.84 64.44 L59.80 64.65 L59.80 69.85 L59.88 70.15 L60.10 70.37 L60.40 70.45 L65.40 70.45 L65.66 70.54 L65.78 70.71 L65.80 70.85 L65.81 75.95 L65.88 76.15 L66.01 76.31 L66.19 76.41 L66.40 76.45 L71.60 76.45 L71.90 76.37 L72.12 76.15 L72.20 75.85 L72.20 70.85 L72.29 70.59 L72.40 70.50 L72.60 70.45 L77.70 70.44 L77.99 70.31 L78.16 70.06 L78.20 69.85 L78.20 64.65 L78.12 64.35 L77.90 64.13 L77.60 64.05 L72.60 64.05 L72.34 63.96 L72.25 63.85 L72.20 63.65 L72.19 58.55 L72.12 58.35 L71.99 58.19 L71.81 58.09 L71.60 58.05 Z M118.34 70.43 L117.71 70.60 L117.11 70.88 L116.57 71.26 L116.11 71.72 L115.83 72.12 L115.45 72.86 L115.28 73.49 L115.22 74.15 L115.28 74.81 L115.45 75.44 L115.73 76.04 L116.11 76.58 L116.57 77.04 L116.97 77.32 L117.71 77.70 L118.34 77.87 L119.00 77.92 L119.66 77.87 L120.29 77.70 L120.89 77.42 L121.43 77.04 L121.89 76.58 L122.17 76.18 L122.55 75.44 L122.72 74.81 L122.78 74.15 L122.72 73.49 L122.55 72.86 L122.27 72.26 L121.89 71.72 L121.43 71.26 L121.03 70.98 L120.29 70.60 L119.66 70.43 L119.00 70.38 L118.34 70.43 Z M125.84 62.93 L125.21 63.10 L124.61 63.38 L124.07 63.76 L123.61 64.22 L123.33 64.62 L122.95 65.36 L122.78 65.99 L122.72 66.65 L122.78 67.31 L122.95 67.94 L123.23 68.54 L123.61 69.08 L124.07 69.54 L124.47 69.82 L125.21 70.20 L125.84 70.37 L126.50 70.42 L127.16 70.37 L127.79 70.20 L128.39 69.92 L128.93 69.54 L129.39 69.08 L129.67 68.68 L130.05 67.94 L130.22 67.31 L130.28 66.65 L130.22 65.99 L130.05 65.36 L129.77 64.76 L129.39 64.22 L128.93 63.76 L128.53 63.48 L127.79 63.10 L127.16 62.93 L126.50 62.88 L125.84 62.93 Z M118.34 55.43 L117.71 55.60 L117.11 55.88 L116.57 56.26 L116.11 56.72 L115.83 57.12 L115.45 57.86 L115.28 58.49 L115.22 59.15 L115.28 59.81 L115.45 60.44 L115.73 61.04 L116.11 61.58 L116.57 62.04 L116.97 62.32 L117.71 62.70 L118.34 62.87 L119.00 62.92 L119.66 62.87 L120.29 62.70 L120.89 62.42 L121.43 62.04 L121.89 61.58 L122.17 61.18 L122.55 60.44 L122.72 59.81 L122.78 59.15 L122.72 58.49 L122.55 57.86 L122.27 57.26 L121.89 56.72 L121.43 56.26 L121.03 55.98 L120.29 55.60 L119.66 55.43 L119.00 55.38 L118.34 55.43 Z M110.84 62.93 L110.21 63.10 L109.61 63.38 L109.07 63.76 L108.61 64.22 L108.33 64.62 L107.95 65.36 L107.78 65.99 L107.72 66.65 L107.78 67.31 L107.95 67.94 L108.23 68.54 L108.61 69.08 L109.07 69.54 L109.47 69.82 L110.21 70.20 L110.84 70.37 L111.50 70.42 L112.16 70.37 L112.79 70.20 L113.39 69.92 L113.93 69.54 L114.39 69.08 L114.67 68.68 L115.05 67.94 L115.22 67.31 L115.28 66.65 L115.22 65.99 L115.05 65.36 L114.77 64.76 L114.39 64.22 L113.93 63.76 L113.53 63.48 L112.79 63.10 L112.16 62.93 L111.50 62.88 L110.84 62.93 Z M89.15 75.03 L88.82 75.12 L88.50 75.27 L88.04 75.64 L87.77 76.00 L87.62 76.32 L87.53 76.65 L87.50 77.00 L87.53 77.35 L87.62 77.68 L87.77 78.00 L87.97 78.29 L88.21 78.53 L88.50 78.73 L88.82 78.88 L89.15 78.97 L89.50 79.00 L89.85 78.97 L90.18 78.88 L90.50 78.73 L90.96 78.36 L91.23 78.00 L91.38 77.68 L91.47 77.35 L91.50 77.00 L91.47 76.65 L91.38 76.32 L91.23 76.00 L91.03 75.71 L90.79 75.47 L90.50 75.27 L90.18 75.12 L89.85 75.03 L89.50 75.00 L89.15 75.03 Z M97.15 75.03 L96.82 75.12 L96.50 75.27 L96.04 75.64 L95.77 76.00 L95.62 76.32 L95.53 76.65 L95.50 77.00 L95.53 77.35 L95.62 77.68 L95.77 78.00 L95.97 78.29 L96.21 78.53 L96.50 78.73 L96.82 78.88 L97.15 78.97 L97.50 79.00 L97.85 78.97 L98.18 78.88 L98.50 78.73 L98.96 78.36 L99.23 78.00 L99.38 77.68 L99.47 77.35 L99.50 77.00 L99.47 76.65 L99.38 76.32 L99.23 76.00 L99.03 75.71 L98.79 75.47 L98.50 75.27 L98.18 75.12 L97.85 75.03 L97.50 75.00 L97.15 75.03 Z M130.88 95.90 L128.38 95.90 L127.93 95.83 L127.69 95.72 L127.30 95.40 L127.06 94.98 L127.00 94.74 L126.97 94.15 L126.89 93.95 L126.76 93.79 L126.48 93.66 L122.62 93.65 L122.42 93.69 L122.24 93.79 L122.11 93.95 L122.03 94.25 L122.03 99.75 L122.09 100.02 L122.27 100.24 L122.62 100.35 L126.56 100.32 L126.80 100.17 L126.91 100.02 L126.97 99.84 L127.00 99.26 L127.06 99.02 L127.30 98.60 L127.67 98.29 L128.13 98.12 L130.88 98.10 L130.88 98.50 L128.38 98.50 L128.03 98.56 L127.88 98.63 L127.61 98.86 L127.44 99.16 L127.36 99.91 L127.27 100.20 L126.96 100.56 L126.68 100.70 L126.38 100.75 L122.62 100.75 L122.32 100.70 L122.04 100.56 L121.73 100.20 L121.62 99.75 L121.62 94.25 L121.75 93.77 L121.98 93.48 L122.28 93.31 L122.62 93.25 L126.38 93.25 L126.72 93.31 L127.02 93.48 L127.24 93.75 L127.36 94.08 L127.44 94.84 L127.61 95.14 L127.88 95.37 L128.05 95.44 L128.38 95.50 L130.88 95.50 L130.88 95.90 Z M130.88 86.90 L128.38 86.90 L128.13 86.88 L127.70 86.73 L127.30 86.40 L127.06 85.98 L127.00 85.74 L126.97 85.15 L126.89 84.95 L126.76 84.79 L126.48 84.66 L122.62 84.65 L122.42 84.69 L122.24 84.79 L122.11 84.95 L122.03 85.25 L122.03 90.75 L122.09 91.02 L122.27 91.24 L122.62 91.35 L126.56 91.32 L126.80 91.17 L126.91 91.02 L126.97 90.84 L127.00 90.26 L127.06 90.02 L127.30 89.60 L127.67 89.29 L128.11 89.13 L130.88 89.10 L130.88 89.50 L128.38 89.50 L128.03 89.56 L127.88 89.63 L127.61 89.86 L127.44 90.16 L127.36 90.91 L127.27 91.20 L126.96 91.56 L126.68 91.70 L126.38 91.75 L122.62 91.75 L122.32 91.70 L122.04 91.56 L121.73 91.20 L121.62 90.75 L121.62 85.25 L121.75 84.77 L121.98 84.48 L122.28 84.31 L122.62 84.25 L126.38 84.25 L126.72 84.31 L127.02 84.48 L127.24 84.75 L127.36 85.08 L127.44 85.84 L127.61 86.14 L127.88 86.37 L128.05 86.44 L128.38 86.50 L130.88 86.50 L130.88 86.90 Z M99.00 60.12 L99.01 63.84 L99.07 64.00 L99.18 64.13 L99.33 64.22 L99.50 64.25 L99.67 64.22 L99.82 64.13 L99.93 64.00 L99.99 63.84 L100.00 56.12 L99.97 55.58 L99.85 55.40 L99.67 55.28 L99.50 55.25 L99.25 55.32 L99.07 55.50 L99.01 55.66 L99.00 60.12 Z M96.00 60.12 L96.01 63.84 L96.07 64.00 L96.18 64.13 L96.33 64.22 L96.50 64.25 L96.67 64.22 L96.82 64.13 L96.93 64.00 L96.99 63.84 L97.00 56.12 L96.97 55.58 L96.85 55.40 L96.67 55.28 L96.50 55.25 L96.25 55.32 L96.07 55.50 L96.01 55.66 L96.00 60.12 Z M94.00 63.75 L93.99 55.66 L93.93 55.50 L93.82 55.37 L93.67 55.28 L93.45 55.25 L93.25 55.32 L93.12 55.43 L93.03 55.58 L93.00 55.75 L93.01 63.84 L93.07 64.00 L93.18 64.13 L93.33 64.22 L93.50 64.25 L93.67 64.22 L93.82 64.13 L93.93 64.00 L94.00 63.75 Z M91.00 59.75 L90.99 63.84 L90.93 64.00 L90.82 64.13 L90.67 64.22 L90.50 64.25 L90.33 64.22 L90.18 64.13 L90.07 64.00 L90.01 63.84 L90.00 55.71 L90.07 55.50 L90.18 55.37 L90.33 55.28 L90.50 55.25 L90.67 55.28 L90.82 55.37 L90.93 55.50 L90.99 55.66 L91.00 59.75 Z M88.00 59.75 L87.99 63.84 L87.93 64.00 L87.82 64.13 L87.67 64.22 L87.50 64.25 L87.33 64.22 L87.18 64.13 L87.03 63.92 L87.00 56.12 L87.03 55.58 L87.12 55.43 L87.25 55.32 L87.50 55.25 L87.67 55.28 L87.85 55.40 L87.97 55.58 L88.00 59.75 Z M135.90 68.39 L135.89 69.54 L135.83 69.70 L135.72 69.83 L135.49 69.94 L134.71 69.94 L134.48 69.83 L134.37 69.70 L134.31 69.54 L134.30 68.81 L134.31 67.66 L134.42 67.43 L134.55 67.32 L134.71 67.26 L135.49 67.26 L135.72 67.37 L135.83 67.50 L135.89 67.66 L135.90 68.39 Z"/>
+        <path class="cap" d="M60.4 64.45 H66.2 V58.65 H71.8 V64.45 H77.6 V70.05 H71.8 V75.85 H66.2 V70.05 H60.4 Z"/>
+        <rect class="arm" data-refs="D9 D10" x="66.2" y="58.65" width="5.6" height="5.8"/>
+        <rect class="arm" data-refs="D8 D7" x="66.2" y="70.05" width="5.6" height="5.8"/>
+        <rect class="arm" data-refs="D9 D8" x="60.4" y="64.45" width="5.8" height="5.6"/>
+        <rect class="arm" data-refs="D10 D7" x="71.8" y="64.45" width="5.8" height="5.6"/>
+        <circle class="key cap" data-refs="D6" cx="89.5" cy="77" r="1.6"/><text class="lbl" x="89.5" y="80.2">SELECT</text>
+        <circle class="key cap" data-refs="D5" cx="97.5" cy="77" r="1.6"/><text class="lbl" x="97.5" y="80.2">START</text>
+        <circle class="key cap" data-refs="D1 D2" cx="119" cy="59.15" r="3.3"/><text class="lbl big" x="119" y="59.25">X</text>
+        <circle class="key cap" data-refs="D1 D4" cx="111.5" cy="66.65" r="3.3"/><text class="lbl big" x="111.5" y="66.75">Y</text>
+        <circle class="key cap" data-refs="D2 D3" cx="126.5" cy="66.65" r="3.3"/><text class="lbl big" x="126.5" y="66.75">A</text>
+        <circle class="key cap" data-refs="D4 D3" cx="119" cy="74.15" r="3.3"/><text class="lbl big" x="119" y="74.25">B</text>
+        <g id="ledg"></g>
+      </svg>
+      <p class="hint" id="console-hint"></p>
+    </section>
+
+    <section>
+      <div class="head"><h2 data-t="effect"></h2><label class="switch"><span data-t="lights_on"></span><input type="checkbox" id="leds_on" role="switch"></label></div>
+      <div class="fx" id="fx" role="radiogroup"></div>
+    </section>
+
+    <section id="order-card">
+      <h2 data-t="fx_wave"></h2>
+      <h3 data-t="colours"></h3>
+      <div class="chips" id="wave-colours"></div>
+      <h3 data-t="direction"></h3>
+      <p class="hint" id="order-hint"></p>
+      <div class="chips" id="orders"></div>
+      <div class="tools" id="rec-tools" hidden>
+        <button type="button" class="btn solid" id="rec-done" data-t="done"></button>
+        <button type="button" class="btn" id="rec-cancel" data-t="cancel"></button>
+      </div>
+    </section>
+
+    <section id="colour-card">
+      <h2 data-t="colour_each"></h2>
+      <p class="hint" id="colour-hint"></p>
+      <div class="colours" id="sw">
+        <label class="pick" id="pick"><i id="pick-dot"></i><span data-t="more_colours"></span><input type="color" id="color"></label>
+      </div>
+      <div class="tools">
+        <button type="button" class="btn" id="fill-all" data-t="same_everywhere"></button>
+        <button type="button" class="btn" id="reset-colours" data-t="rainbow"></button>
+      </div>
+    </section>
+
+    <section>
+      <div class="row" id="speed-row"><label for="speed" data-t="speed"></label><input type="range" id="speed" min="1" max="10" step="1"><span class="val" id="spv"></span></div>
+      <div class="row"><label for="led_brightness" id="lb-label" data-t="brightness"></label><input type="range" id="led_brightness" min="0" max="100" step="5"><span class="val" id="lb"></span></div>
+      <label class="switch"><input type="checkbox" id="led_follow" role="switch"><span data-t="follow_screen"></span></label>
+      <p class="hint" id="follow-hint" hidden></p>
+    </section>
+  </div>
+
+  <!-- ===================================================== Games -->
+  <div id="panel-games" class="panel" role="tabpanel" aria-labelledby="tab-games" hidden>
+    <section>
+      <div class="head"><h2 data-t="storage"></h2><span class="hint" id="drive-free"></span></div>
+      <div class="meter"><i id="drive-meter" style="width:0"></i></div>
+      <p class="hint" id="drive-note"></p>
+    </section>
+    <section>
+      <h2 data-t="add_games"></h2>
+      <div class="seg" role="group">
+        <button type="button" id="mode-auto" aria-pressed="true" data-t="mode_auto"></button>
+        <button type="button" id="mode-folder" aria-pressed="false" data-t="mode_folder"></button>
+      </div>
+      <p class="dest" id="dest"></p>
+      <div class="drop" id="drop">
+        <label class="btn solid choose"><span data-t="choose_games"></span><input type="file" id="files" multiple></label>
+        <span class="or" data-t="or_drag"></span>
+      </div>
+      <div class="ups" id="uploads"></div>
+    </section>
+    <section class="tree-card">
+      <div class="head"><h2 data-t="on_console"></h2><button type="button" class="btn" id="collapse" data-t="close_all"></button></div>
+      <div class="tree" id="tree" role="tree"></div>
+      <p class="dest" id="newdir-where"></p>
+      <div class="newdir"><input id="newdir"><button type="button" class="btn" id="mkdir" data-t="create"></button></div>
+    </section>
+  </div>
+
+  <!-- ===================================================== Console -->
+  <div id="panel-system" class="panel" role="tabpanel" aria-labelledby="tab-system" hidden>
+    <section>
+      <h2 data-t="screen_sound"></h2>
+      <div class="row"><label for="screen" data-t="brightness"></label><input type="range" id="screen" min="10" max="100" step="5"><span class="val" id="sb"></span></div>
+      <div class="row"><label for="volume" data-t="volume"></label><input type="range" id="volume" min="0" max="100" step="5"><span class="val" id="vv"></span></div>
+      <p class="hint" id="volume-note" data-t="volume_later" hidden></p>
+    </section>
+    <section>
+      <h2 data-t="power"></h2>
+      <div class="tools">
+        <button type="button" class="btn" data-power="retroarch" data-t="restart_menu"></button>
+        <button type="button" class="btn" data-power="reboot" data-t="restart_console"></button>
+        <button type="button" class="btn danger" data-power="poweroff" data-t="turn_off"></button>
+      </div>
+      <p class="hint" data-t="power_note"></p>
+    </section>
+    <section>
+      <h2 data-t="about"></h2>
+      <dl id="info"></dl>
+    </section>
+    <section>
+      <h2 data-t="shortcuts"></h2>
+      <p class="hint" data-t="shortcuts_how"></p>
+      <dl class="keys" id="keys"></dl>
+    </section>
+  </div>
+</main>
+<script>
+"use strict";
+// ------------------------------------------------------------------ words (English, French)
+const T = {
+  en: {
+    connecting: "Connecting…", connected: "Connected", saved: "Saved", unreachable: "Can't reach the Pi Tin. Is it on the same Wi-Fi?",
+    tab_leds: "Lights", tab_games: "Games", tab_system: "Console",
+    drawing: "The console with its buttons and lights",
+    hint_press: "Tap a button on the drawing to see how the lights react.",
+    hint_pick: "Tap a light (small circle) to choose its colour, or a button to see the lights react.",
+    hint_rec: "Tap the lights in the order you want: {n} of 10.",
+    effect: "Effect", lights_on: "On",
+    fx_off: "Off", fx_off_d: "The lights are off.",
+    fx_static: "Static", fx_static_d: "Each light keeps its colour.",
+    fx_wave: "Wave", fx_wave_d: "The colours move from light to light.",
+    fx_fade: "Fade", fx_fade_d: "All the lights slowly change colour together.",
+    fx_reactive: "Reactive", fx_reactive_d: "The lights next to a button come on when you press it.",
+    colours: "Colours", rainbow: "Rainbow", my_colours: "My colours", direction: "Direction",
+    o_ltr: "Left to right", o_rtl: "Right to left", o_cw: "Clockwise", o_acw: "Anticlockwise", o_own: "Choose my own…",
+    order_hint: "The numbers on the drawing show the way the colours go.",
+    order_rec: "Tap the lights on the drawing one after the other. “Done” puts the others after them.",
+    done: "Done", cancel: "Cancel",
+    colour_each: "Colour of each light", colour_hint: "Tap a light on the drawing, then choose a colour. Chosen light: {name}.",
+    more_colours: "More colours…", same_everywhere: "Same colour on all", speed: "Speed", brightness: "Brightness", max_brightness: "Maximum",
+    follow_screen: "Auto brightness (follows the screen)", follow_now: "Now {now} %: the lights dim with the screen, up to the maximum.",
+    storage: "Storage", free_of: "{free} free of {total}",
+    drive_note: "Your games, in one folder per console. On the console, open them from the menu with “Load Content”.",
+    drive_away: "Your games can't be reached right now: the console is plugged into a computer. Unplug the cable and try again.",
+    add_games: "Add games", mode_auto: "Sort automatically", mode_folder: "Into one folder",
+    dest_auto: "Each game goes into the folder of its console. Files that aren't recognised go into: ",
+    dest_folder: "Everything goes into: ", dest_folder2: ". Tap another folder below to change it.",
+    choose_games: "Choose games", or_drag: "or drag the files here",
+    up_done: "Done", up_there: "Already there", up_replace: "Replace", up_failed: "Didn't work", up_stopped: "Stopped",
+    on_console: "On the console", close_all: "Close all", all_games: "All games", empty: "Empty",
+    files_1: "1 file", files_n: "{n} files", new_badge: "new", delete: "Delete", sure: "Sure?",
+    new_folder_in: "New folder in {where}:", folder_name: "Folder name", create: "Create",
+    screen_sound: "Screen and sound", volume: "Volume", volume_later: "The volume can be changed once a game or the menu has played a sound.",
+    power: "Turn off and restart", restart_menu: "Restart the game menu", restart_console: "Restart the console", turn_off: "Turn off",
+    tap_again: "Tap again to confirm", power_note: "Your game is saved before it closes.",
+    p_retroarch: "Restarting the game menu…", p_reboot: "Restarting…", p_poweroff: "Turning off…",
+    about: "About this console", i_address: "This page", i_name: "Console name", i_menu: "Game menu", i_running: "Running", i_stopped: "Stopped",
+    i_temp: "Temperature", i_up: "Switched on for", i_free: "Free space", i_away: "Plugged into a computer", i_none: "No Wi-Fi", unknown: "–",
+    shortcuts: "Shortcuts", shortcuts_how: "Hold SPECIAL and press:",
+    k_menu: "Game menu", k_state: "Load (hold 1 s) / save the game", k_slot: "Previous / next save", k_vol: "Volume up / down", k_reset: "Restart the game (hold 1 s)",
+    k_quit: "Quit the game, saved (hold 1 s)", k_bright: "Screen darker / brighter", k_leds: "Lights on / off", k_fx: "Next light effect", k_quick: "List of shortcuts on the screen (they work there without SPECIAL)",
+    led: {D1: "ABXY, top left", D2: "ABXY, top right", D3: "ABXY, bottom right", D4: "ABXY, bottom left", D5: "Start", D6: "Select",
+          D7: "D-pad, bottom right", D8: "D-pad, bottom left", D9: "D-pad, top left", D10: "D-pad, top right"},
+    consoles: {gb: "Game Boy", gbc: "Game Boy Color", gba: "Game Boy Advance", nes: "NES", snes: "SNES", megadrive: "Mega Drive",
+               mastersystem: "Master System", gamegear: "Game Gear", pcengine: "PC Engine", psx: "PlayStation", nds: "Nintendo DS"},
+    units: ["kB", "MB", "GB"], day: "d",
+    err: {not_mounted: "Your games can't be reached right now: the console is plugged into a computer.", bad_name: "That name can't be used. Avoid these characters: < > : \" \\ | ? *",
+          name_needed: "Please type a name.", name_taken: "Something with that name is already there.", exists: "A file with that name is already there.",
+          too_large: "This file is too big (over 4 GB).", no_space: "There isn't enough free space.", not_empty: "The folder isn't empty. Delete what's inside first.",
+          gone: "It was already deleted.", no_volume: "The volume can be changed once a game or the menu has played a sound.",
+          password: "This page needs a password.", failed: "Something went wrong. Try again.", not_found: "Not found.", bad_request: "Something went wrong. Try again."},
+  },
+  fr: {
+    connecting: "Connexion…", connected: "Connecté", saved: "Enregistré", unreachable: "Impossible de joindre la Pi Tin. Est-elle sur le même Wi-Fi ?",
+    tab_leds: "Lumières", tab_games: "Jeux", tab_system: "Console",
+    drawing: "La console avec ses boutons et ses lumières",
+    hint_press: "Touchez un bouton sur le dessin pour voir la réaction des lumières.",
+    hint_pick: "Touchez une lumière (petit rond) pour choisir sa couleur, ou un bouton pour voir les lumières réagir.",
+    hint_rec: "Touchez les lumières dans l'ordre voulu : {n} sur 10.",
+    effect: "Effet", lights_on: "Allumé",
+    fx_off: "Éteint", fx_off_d: "Les lumières sont éteintes.",
+    fx_static: "Fixe", fx_static_d: "Chaque lumière garde sa couleur.",
+    fx_wave: "Vague", fx_wave_d: "Les couleurs passent d'une lumière à l'autre.",
+    fx_fade: "Fondu", fx_fade_d: "Toutes les lumières changent doucement de couleur ensemble.",
+    fx_reactive: "Réactif", fx_reactive_d: "Les lumières à côté d'un bouton s'allument quand on appuie dessus.",
+    colours: "Couleurs", rainbow: "Arc-en-ciel", my_colours: "Mes couleurs", direction: "Sens",
+    o_ltr: "De gauche à droite", o_rtl: "De droite à gauche", o_cw: "Sens horaire", o_acw: "Sens antihoraire", o_own: "Choisir moi-même…",
+    order_hint: "Les numéros sur le dessin montrent le chemin des couleurs.",
+    order_rec: "Touchez les lumières sur le dessin l'une après l'autre. « Terminé » place les autres à la suite.",
+    done: "Terminé", cancel: "Annuler",
+    colour_each: "Couleur de chaque lumière", colour_hint: "Touchez une lumière sur le dessin, puis choisissez une couleur. Lumière choisie : {name}.",
+    more_colours: "Plus de couleurs…", same_everywhere: "Même couleur partout", speed: "Vitesse", brightness: "Luminosité", max_brightness: "Maximum",
+    follow_screen: "Luminosité automatique (suit l'écran)", follow_now: "Actuellement {now} % : les lumières baissent avec l'écran, jusqu'au maximum.",
+    storage: "Stockage", free_of: "{free} libres sur {total}",
+    drive_note: "Vos jeux, avec un dossier par console. Sur la console, ouvrez-les depuis le menu avec « Load Content ».",
+    drive_away: "Vos jeux ne sont pas accessibles pour le moment : la console est branchée à un ordinateur. Débranchez le câble et réessayez.",
+    add_games: "Ajouter des jeux", mode_auto: "Trier automatiquement", mode_folder: "Dans un seul dossier",
+    dest_auto: "Chaque jeu va dans le dossier de sa console. Les fichiers non reconnus vont dans : ",
+    dest_folder: "Tout va dans : ", dest_folder2: ". Touchez un autre dossier plus bas pour changer.",
+    choose_games: "Choisir des jeux", or_drag: "ou glissez les fichiers ici",
+    up_done: "Terminé", up_there: "Déjà présent", up_replace: "Remplacer", up_failed: "Échec", up_stopped: "Interrompu",
+    on_console: "Sur la console", close_all: "Tout fermer", all_games: "Tous les jeux", empty: "Vide",
+    files_1: "1 fichier", files_n: "{n} fichiers", new_badge: "nouveau", delete: "Supprimer", sure: "Sûr ?",
+    new_folder_in: "Nouveau dossier dans {where} :", folder_name: "Nom du dossier", create: "Créer",
+    screen_sound: "Écran et son", volume: "Volume", volume_later: "Le volume se règle dès qu'un jeu ou le menu a joué un son.",
+    power: "Éteindre et redémarrer", restart_menu: "Redémarrer le menu des jeux", restart_console: "Redémarrer la console", turn_off: "Éteindre",
+    tap_again: "Touchez encore pour confirmer", power_note: "Votre partie est sauvegardée avant la fermeture.",
+    p_retroarch: "Redémarrage du menu…", p_reboot: "Redémarrage…", p_poweroff: "Extinction…",
+    about: "À propos de cette console", i_address: "Cette page", i_name: "Nom de la console", i_menu: "Menu des jeux", i_running: "En marche", i_stopped: "Arrêté",
+    i_temp: "Température", i_up: "Allumée depuis", i_free: "Espace libre", i_away: "Branchée à un ordinateur", i_none: "Pas de Wi-Fi", unknown: "–",
+    shortcuts: "Raccourcis", shortcuts_how: "Maintenez SPECIAL et appuyez sur :",
+    k_menu: "Menu des jeux", k_state: "Charger (maintenir 1 s) / sauvegarder la partie", k_slot: "Sauvegarde précédente / suivante", k_vol: "Volume plus / moins", k_reset: "Recommencer le jeu (maintenir 1 s)",
+    k_quit: "Quitter le jeu, sauvegardé (maintenir 1 s)", k_bright: "Écran plus sombre / plus clair", k_leds: "Lumières allumées / éteintes", k_fx: "Effet de lumière suivant", k_quick: "Liste des raccourcis à l'écran (ils y marchent sans SPECIAL)",
+    led: {D1: "ABXY, en haut à gauche", D2: "ABXY, en haut à droite", D3: "ABXY, en bas à droite", D4: "ABXY, en bas à gauche", D5: "Start", D6: "Select",
+          D7: "croix, en bas à droite", D8: "croix, en bas à gauche", D9: "croix, en haut à gauche", D10: "croix, en haut à droite"},
+    consoles: {gb: "Game Boy", gbc: "Game Boy Color", gba: "Game Boy Advance", nes: "NES", snes: "Super Nintendo", megadrive: "Mega Drive",
+               mastersystem: "Master System", gamegear: "Game Gear", pcengine: "PC Engine", psx: "PlayStation", nds: "Nintendo DS"},
+    units: ["ko", "Mo", "Go"], day: "j",
+    err: {not_mounted: "Vos jeux ne sont pas accessibles : la console est branchée à un ordinateur.", bad_name: "Ce nom n'est pas possible. Évitez ces caractères : < > : \" \\ | ? *",
+          name_needed: "Écrivez un nom.", name_taken: "Il y a déjà quelque chose avec ce nom.", exists: "Un fichier avec ce nom est déjà là.",
+          too_large: "Ce fichier est trop gros (plus de 4 Go).", no_space: "Il n'y a pas assez de place.", not_empty: "Le dossier n'est pas vide. Supprimez d'abord ce qu'il contient.",
+          gone: "C'était déjà supprimé.", no_volume: "Le volume se règle dès qu'un jeu ou le menu a joué un son.",
+          password: "Cette page demande un mot de passe.", failed: "Un problème est survenu. Réessayez.", not_found: "Introuvable.", bad_request: "Un problème est survenu. Réessayez."},
+  },
+};
+// The browser's language decides: French if it comes before English in the browser's list, otherwise English.
+function browserLang() {
+  for (const l of navigator.languages || [navigator.language || ""]) {
+    const two = String(l).slice(0, 2).toLowerCase();
+    if (T[two]) return two;
+  }
+  return "en";
+}
+let lang = browserLang();
+const t = (key, vars = {}) => String(T[lang][key] ?? T.en[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+const errText = e => (e && e.body && T[lang].err[e.body.code]) || (e && e.status ? e.message : t("unreachable"));
+
+const $ = id => document.getElementById(id);
+const api = (path, opts = {}) => fetch(path, opts).then(async r => {
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(body.error || "Request failed (" + r.status + ")."), {status: r.status, body});
+  return body;
+});
+const post = (path, data) => api(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
+let statusKey = "connecting", statusBad = false;
+function setStatus(key, bad, raw) { statusKey = key; statusBad = !!bad; $("status").textContent = raw || t(key); $("status").className = bad ? "bad" : ""; }
+function fmtSize(n) {
+  const [k, m, g] = T[lang].units, nf = d => new Intl.NumberFormat(lang, {maximumFractionDigits: d, minimumFractionDigits: d});
+  return n >= 1e9 ? nf(1).format(n / 1e9) + " " + g : n >= 1e6 ? nf(n >= 1e8 ? 0 : 1).format(n / 1e6) + " " + m : Math.max(1, Math.round(n / 1e3)) + " " + k;
+}
+
+// ------------------------------------------------------------------ tabs
+const TABS = ["leds", "games", "system"];
+function openTab(name) {
+  if (!TABS.includes(name)) name = "leds";
+  for (const x of TABS) { $("panel-" + x).hidden = x !== name; $("tab-" + x).setAttribute("aria-selected", x === name); }
+  if (name === "games") loadTree();
+  if (name === "system") loadInfo();
+  if (location.hash.slice(1) !== name) try { history.replaceState(null, "", "#" + name); } catch (e) {}
+}
+for (const x of TABS) $("tab-" + x).onclick = () => openTab(x);
+
+// ------------------------------------------------------------------ lights
+const EFFECTS = ["off", "static", "wave", "fade", "reactive"];
+const PRESETS = ["#ff7a1a", "#ff2d55", "#7c4dff", "#2f80ff", "#00c2a8", "#ffffff"];
+// LED centres on the PCB (mm, front view).
+const POS = {D1: [111.4, 59.1], D2: [126.6, 59.1], D3: [126.5, 74.3], D4: [111.4, 74.3], D5: [97.5, 72.55], D6: [89.5, 72.55],
+             D7: [76, 74.3], D8: [62, 74.3], D9: [62, 60.3], D10: [76, 60.3]};
+const LTR = ["D8", "D9", "D10", "D7", "D6", "D5", "D4", "D1", "D2", "D3"];   // left to right, following the buttons
+const CW = ["D9", "D10", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"];    // round the console, clockwise
+const ORDERS = [["o_ltr", LTR], ["o_rtl", [...LTR].reverse()], ["o_cw", CW], ["o_acw", [...CW].reverse()]];
+const ALL = LTR;
+const hsvHex = h => "#" + hsv(h).map(v => Math.round(v).toString(16).padStart(2, "0")).join("");
+function hsv(h) { h = ((h % 1) + 1) % 1; const f = n => { const k = (n + h * 6) % 6; return 255 * (1 - Math.max(0, Math.min(k, 4 - k, 1))); }; return [f(5), f(3), f(1)]; }
+const rainbowFor = order => Object.fromEntries(order.map((r, i) => [r, hsvHex(i / order.length)]));
+
+let st = null, pending = {}, timer = null, lastInput = 0, sel = "D5", recording = null;
+const flash = {};
+const usesColours = () => st && (st.effect === "static" || st.effect === "reactive" || (st.effect === "wave" && st.wave === "mine"));
+
+for (const id of EFFECTS) {
+  const l = document.createElement("label");
+  l.innerHTML = `<input type="radio" name="effect" value="${id}" id="fx-${id}"><div><b data-t="fx_${id}"></b><span data-t="fx_${id}_d"></span></div>`;
+  l.querySelector("input").onchange = () => { recording = null; send({effect: id, leds_on: true}); };
+  $("fx").appendChild(l);
+}
+for (const c of PRESETS) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "sw"; b.style.background = c; b.dataset.c = c; b.setAttribute("aria-label", c);
+  b.onclick = () => send({colors: {[sel]: c}});
+  $("sw").insertBefore(b, $("pick"));
+}
+for (const [id, key] of [["rainbow", "rainbow"], ["mine", "my_colours"]]) {
+  const b = Object.assign(document.createElement("button"), {type: "button"});
+  b.dataset.wave = id; b.dataset.t = key; b.onclick = () => send({wave: id});
+  $("wave-colours").append(b);
+}
+for (const [key, order] of ORDERS) {
+  const b = Object.assign(document.createElement("button"), {type: "button"});
+  b.dataset.order = order.join(" "); b.dataset.t = key;
+  b.onclick = () => { recording = null; send({order}); };
+  $("orders").append(b);
+}
+const own = Object.assign(document.createElement("button"), {type: "button", id: "rec-start"});
+own.dataset.t = "o_own";
+own.onclick = () => { recording = []; show(st); };
+$("orders").append(own);
+$("rec-done").onclick = () => { if (!recording) return; const order = recording.concat(st.order.filter(r => !recording.includes(r))); recording = null; send({order}); };
+$("rec-cancel").onclick = () => { recording = null; show(st); };
+
+const svgNS = "http://www.w3.org/2000/svg";
+const ledEls = {};
+for (const ref of ALL) {
+  const [x, y] = POS[ref], g = document.createElementNS(svgNS, "g"), below = ["D3", "D4", "D7", "D8"].includes(ref);
+  g.innerHTML = `<circle class="halo" cx="${x}" cy="${y}" r="2.5" filter="url(#glow)" opacity="0"/>` +
+    `<circle class="led" cx="${x}" cy="${y}" r="1.5"/><circle class="ring" cx="${x}" cy="${y}" r="2.5" visibility="hidden"/>` +
+    `<text class="ord" x="${x}" y="${below ? y + 3.4 : y - 3.1}" visibility="hidden"></text>` +
+    `<circle class="hit" cx="${x}" cy="${y}" r="2.8"><title></title></circle>`;
+  g.querySelector(".hit").onclick = () => tapLed(ref);
+  $("ledg").appendChild(g);
+  ledEls[ref] = {led: g.querySelector(".led"), halo: g.querySelector(".halo"), ring: g.querySelector(".ring"), ord: g.querySelector(".ord"), title: g.querySelector("title")};
+}
+for (const el of document.querySelectorAll(".console [data-refs]")) el.addEventListener("click", () => { for (const r of el.dataset.refs.split(" ")) flash[r] = 1; });
+function tapLed(ref) {
+  if (recording) { if (!recording.includes(ref)) recording.push(ref); if (recording.length === ALL.length) $("rec-done").click(); else show(st); return; }
+  if (usesColours()) { sel = ref; show(st); } else flash[ref] = 1;
+}
+$("color").oninput = e => send({colors: {[sel]: e.target.value}});
+$("fill-all").onclick = () => send({colors: Object.fromEntries(ALL.map(r => [r, st.colors[sel]]))});
+$("reset-colours").onclick = () => send({colors: rainbowFor(st.order)});
+
+function show(s) {
+  st = s;
+  if (!s) return;
+  $("leds_on").checked = s.leds_on;
+  for (const r of document.querySelectorAll("#fx input")) r.checked = r.value === s.effect;
+  const per = usesColours(), wave = s.effect === "wave", active = s.colors[sel];
+  $("colour-card").hidden = !per;
+  $("colour-hint").textContent = t("colour_hint", {name: T[lang].led[sel]});
+  $("console-hint").textContent = recording ? t("hint_rec", {n: recording.length}) : per ? t("hint_pick") : t("hint_press");
+  let preset = false;
+  for (const b of $("sw").querySelectorAll(".sw")) { const on = b.dataset.c === active; b.classList.toggle("on", on); preset ||= on; }
+  $("pick").classList.toggle("on", !preset);
+  $("pick-dot").style.background = preset ? "" : active;
+  $("color").value = active;
+  $("order-card").hidden = !wave;
+  for (const b of $("wave-colours").children) b.setAttribute("aria-pressed", b.dataset.wave === s.wave);
+  const key = s.order.join(" ");
+  let known = false;
+  for (const b of $("orders").querySelectorAll("[data-order]")) { const on = !recording && b.dataset.order === key; b.setAttribute("aria-pressed", on); known ||= on; }
+  own.setAttribute("aria-pressed", !!recording || !known);
+  $("rec-tools").hidden = !recording;
+  $("order-hint").textContent = recording ? t("order_rec") : t("order_hint");
+  for (const ref of ALL) {
+    const e = ledEls[ref], n = recording ? recording.indexOf(ref) + 1 : s.order.indexOf(ref) + 1;
+    e.ring.setAttribute("visibility", per && !recording && ref === sel ? "visible" : "hidden");
+    e.ord.textContent = n || "";
+    e.ord.setAttribute("visibility", wave && n ? "visible" : "hidden");
+    e.title.textContent = T[lang].led[ref];
+  }
+  $("speed-row").hidden = !["wave", "fade"].includes(s.effect);
+  $("speed").value = s.speed; $("spv").textContent = s.speed;
+  $("led_brightness").value = s.led_brightness; $("lb").textContent = s.led_brightness + " %";
+  $("led_follow").checked = !!s.led_follow;
+  $("lb-label").dataset.t = s.led_follow ? "max_brightness" : "brightness"; $("lb-label").textContent = t($("lb-label").dataset.t);
+  $("follow-hint").hidden = !s.led_follow;
+  $("follow-hint").textContent = t("follow_now", {now: ledNow(s)});
+  $("screen").value = s.screen; $("sb").textContent = s.screen + " %";
+}
+
+function send(ch) {
+  lastInput = Date.now();
+  for (const [k, v] of Object.entries(ch)) pending[k] = k === "colors" ? Object.assign({}, pending.colors, v) : v;
+  if (st) show(Object.assign({}, st, pending, {colors: Object.assign({}, st.colors, pending.colors)}));
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    const body = pending; pending = {};
+    post("/api/state", body).then(s => { show(s); setStatus("saved"); })
+      .catch(e => setStatus("", true, errText(e)));
+  }, 80);
+}
+function poll() {
+  if (recording || Date.now() - lastInput < 1500 || Object.keys(pending).length) return;
+  api("/api/state").then(s => { show(s); if (statusKey !== "saved") setStatus("connected"); })
+    .catch(e => setStatus("", true, errText(e)));
+}
+$("leds_on").onchange = e => send({leds_on: e.target.checked});
+$("led_follow").onchange = e => send({led_follow: e.target.checked});
+// The LEDs' brightness now: with led_follow, the setting (their maximum) scaled by the screen's (as pitin-daemon does).
+function ledNow(s) { return s.led_follow ? Math.round(s.led_brightness * s.screen / 100) : s.led_brightness; }
+$("speed").oninput = e => send({speed: +e.target.value});
+$("led_brightness").oninput = e => send({led_brightness: +e.target.value});
+$("screen").oninput = e => send({screen: +e.target.value});
+
+// Same effects as pitin-daemon, drawn on the console.
+const still = matchMedia("(prefers-reduced-motion: reduce)");
+const rgbOf = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, f) => a.map((v, i) => v + (b[i] - v) * f);
+let clock = 0, prevMs = null;
+function frameFor(s, tm) {
+  const out = {};
+  if (!s.leds_on || s.effect === "off") return out;
+  if (s.effect === "static") for (const r of ALL) out[r] = rgbOf(s.colors[r]);
+  else if (s.effect === "wave") {
+    const order = s.order, n = order.length;
+    if (s.wave !== "mine") order.forEach((r, i) => out[r] = hsv((tm - i) / n));
+    else {
+      const pal = order.map(r => rgbOf(s.colors[r]));
+      order.forEach((r, i) => { const p = (((i - tm) % n) + n) % n, k = Math.floor(p) % n; out[r] = mix(pal[k], pal[(k + 1) % n], p - Math.floor(p)); });
+    }
+  } else if (s.effect === "fade") { const c = hsv(tm / 12); for (const r of ALL) out[r] = c; }
+  else if (s.effect === "reactive") for (const r in flash) out[r] = rgbOf(s.colors[r]).map(v => v * flash[r]);
+  return out;
+}
+function draw(ms) {
+  const dt = prevMs === null ? 0 : Math.min(0.2, (ms - prevMs) / 1000); prevMs = ms;
+  for (const r in flash) { flash[r] *= Math.pow(0.82, dt * 30); if (flash[r] < 0.02) delete flash[r]; }
+  if (st) {
+    if (!still.matches) clock += dt * Math.pow(2, (st.speed - 5) / 2.5);
+    const out = frameFor(st, clock), glow = 0.35 + 0.65 * ledNow(st) / 100;
+    for (const ref of ALL) {
+      const c = out[ref], e = ledEls[ref];
+      if (!c || ledNow(st) === 0 || Math.max(...c) < 3) { e.led.style.fill = ""; e.halo.setAttribute("opacity", 0); continue; }
+      const peak = Math.max(...c) / 255, rgb = `rgb(${c.map(v => Math.round(v / peak)).join(",")})`;
+      e.led.style.fill = `color-mix(in srgb, ${rgb} ${Math.round(peak * glow * 100)}%, var(--led-off))`;
+      e.halo.style.fill = rgb; e.halo.setAttribute("opacity", (0.7 * peak * glow).toFixed(2));
+    }
+  }
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// ------------------------------------------------------------------ games
+// Console folders and the file types that go in each (the same folders install.sh creates).
+const EXTS = {gb: "gb", gbc: "gbc", gba: "gba", nes: "nes fds unf unif", snes: "sfc smc", megadrive: "md gen smd",
+              mastersystem: "sms", gamegear: "gg", pcengine: "pce", psx: "cue chd pbp m3u", nds: "nds"};
+const BY_EXT = {};
+for (const [dir, exts] of Object.entries(EXTS)) for (const e of exts.split(" ")) BY_EXT[e] = dir;
+const ICON = {
+  folder: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h4.3l1.5 1.6h7.2v7.4h-13z"/></svg>',
+  file: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 1.5h5.6l3.4 3.4v9.6h-9z"/><path d="M9 1.5v3.5h3.5"/></svg>',
+  drive: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="4.5" width="13" height="7" rx="1.5"/><path d="M11 8h1"/></svg>',
+};
+let tree = null, treeError = null, target = "", mode = "auto", lastDrive = null;
+const expanded = new Set([""]), fresh = new Set();
+const encPath = p => p.split("/").filter(Boolean).map(encodeURIComponent).join("/");
+const join = (a, b) => a ? a + "/" + b : b;
+const ext = name => ((name.match(/\.([^.]+)$/) || [])[1] || "").toLowerCase();
+const stem = name => name.replace(/\.[^.]+$/, "").toLowerCase();
+const consoleName = path => !path.includes("/") && T[lang].consoles[path.toLowerCase()] || null;
+const folderTitle = p => !p ? t("all_games") : consoleName(p) || p.split("/").pop();
+const countFiles = node => node.files.length + node.folders.reduce((a, f) => a + countFiles(f), 0);
+function findNode(path, node = tree) {
+  if (!node) return null;
+  if (node.path === path) return node;
+  for (const f of node.folders) if (path === f.path || path.startsWith(f.path + "/")) return findNode(path, f);
+  return null;
+}
+const hasFile = (dir, name) => { const n = findNode(dir); return !!n && n.files.some(f => f.name.toLowerCase() === name.toLowerCase()); };
+// FAT ignores case: reuse an existing "GBA" folder for .gba files.
+const folderFor = dir => { const f = tree && tree.folders.find(x => x.name.toLowerCase() === dir); return f ? f.path : dir; };
+function destFor(file, batch) {
+  if (mode !== "auto") return target;
+  const byType = BY_EXT[ext(file.name)];
+  if (byType) return folderFor(byType);
+  const twin = batch.find(o => o !== file && stem(o.name) === stem(file.name) && BY_EXT[ext(o.name)]);   // a .bin goes with its .cue
+  return twin ? folderFor(BY_EXT[ext(twin.name)]) : target;
+}
+function showDrive(d) {
+  lastDrive = d;
+  if (!d || !d.mounted) {
+    $("drive-free").textContent = ""; $("drive-meter").style.width = "0";
+    $("drive-note").textContent = t("drive_away"); $("drive-note").className = "hint bad";
+    return;
+  }
+  $("drive-free").textContent = t("free_of", {free: fmtSize(d.free), total: fmtSize(d.total)});
+  $("drive-meter").style.width = (100 * (1 - d.free / d.total)).toFixed(1) + "%";
+  $("drive-note").textContent = t("drive_note"); $("drive-note").className = "hint";
+}
+function loadTree() {
+  return api("/api/tree").then(d => { tree = d.tree; treeError = null; showDrive(d); if (!findNode(target)) target = ""; renderTree(); renderDest(); })
+    .catch(e => { tree = null; treeError = errText(e); showDrive({mounted: false}); renderTree(); renderDest(); });
+}
+function renderDest() {
+  $("mode-auto").setAttribute("aria-pressed", mode === "auto");
+  $("mode-folder").setAttribute("aria-pressed", mode === "folder");
+  const d = $("dest"), where = document.createElement("b");
+  where.textContent = folderTitle(target);
+  d.innerHTML = "";
+  if (mode === "auto") d.append(t("dest_auto"), where, ".");
+  else d.append(t("dest_folder"), where, t("dest_folder2"));
+}
+function renderTree() {
+  const box = $("tree");
+  box.innerHTML = "";
+  $("newdir-where").hidden = $("newdir").parentElement.hidden = !tree;
+  if (!tree) { box.append(Object.assign(document.createElement("div"), {className: "empty" + (treeError ? " bad" : ""), textContent: treeError || t("connecting")})); return; }
+  const add = (node, depth) => {
+    box.append(folderRow(node, depth));
+    if (!expanded.has(node.path)) return;
+    const title = f => folderTitle(f.path);
+    for (const f of [...node.folders].sort((a, b) => title(a).localeCompare(title(b), lang))) add(f, depth + 1);
+    for (const f of node.files) box.append(fileRow(node, f, depth + 1));
+    if (!node.folders.length && !node.files.length) {
+      const e = document.createElement("div"); e.className = "node"; e.style.setProperty("--d", depth + 1);
+      e.innerHTML = '<span></span><span></span><span></span><span class="meta"></span>'; e.lastChild.textContent = t("empty"); box.append(e);
+    }
+  };
+  add(tree, 0);
+  const [before, after] = (T[lang].new_folder_in || T.en.new_folder_in).split("{where}"), where = Object.assign(document.createElement("b"), {textContent: folderTitle(target)});
+  $("newdir-where").replaceChildren(before, where, after);
+  $("newdir").placeholder = t("folder_name");
+  $("newdir").setAttribute("aria-label", t("new_folder_in", {where: folderTitle(target)}));
+}
+function folderRow(node, depth) {
+  const row = document.createElement("div"), open = expanded.has(node.path), count = countFiles(node);
+  row.className = "node folder" + (open ? " open" : "") + (node.path === target ? " sel" : "");
+  row.style.setProperty("--d", depth);
+  row.setAttribute("role", "treeitem"); row.setAttribute("aria-expanded", open); row.setAttribute("aria-selected", node.path === target); row.tabIndex = 0;
+  row.innerHTML = `<span></span><span class="chev">▶</span>${node.path ? ICON.folder : ICON.drive}<span class="label"></span><span class="meta"></span><span></span>`;
+  const lab = row.querySelector(".label");
+  lab.append(Object.assign(document.createElement("b"), {textContent: folderTitle(node.path)}));
+  if (node.path && consoleName(node.path)) lab.append(Object.assign(document.createElement("code"), {textContent: node.name}));
+  row.querySelector(".meta").textContent = !count ? "" : count === 1 ? t("files_1") : t("files_n", {n: count});
+  if (node.path && node.path === target && !count && !node.folders.length) row.lastChild.replaceWith(delButton(node.path, node.name));
+  const act = () => {
+    if (node.path && node.path === target && open) expanded.delete(node.path); else expanded.add(node.path);
+    target = node.path; renderTree(); renderDest();
+  };
+  row.onclick = e => { if (!e.target.closest(".x")) act(); };
+  row.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); } };
+  return row;
+}
+function fileRow(parent, f, depth) {
+  const path = join(parent.path, f.name), row = document.createElement("div");
+  row.className = "node file" + (fresh.has(path) ? " fresh" : "");
+  row.style.setProperty("--d", depth); row.setAttribute("role", "treeitem");
+  row.innerHTML = `<span></span><span></span>${ICON.file}<span class="label"></span><span class="meta"></span><span></span>`;
+  row.querySelector(".label").textContent = f.name;
+  row.querySelector(".label").dataset.new = t("new_badge");
+  row.querySelector(".meta").textContent = fmtSize(f.size);
+  row.lastChild.replaceWith(delButton(path, f.name));
+  return row;
+}
+function delButton(path, name) {
+  const x = Object.assign(document.createElement("button"), {type: "button", className: "x", textContent: t("delete")});
+  x.setAttribute("aria-label", t("delete") + " " + name);
+  armed(x, () => t("sure"), () => api("/api/roms/" + encPath(path), {method: "DELETE"}).then(loadTree).catch(e => setStatus("", true, errText(e))));
+  return x;
+}
+// Two-step buttons: the first tap arms, the second (within 3 s) confirms.
+function armed(btn, armedText, action) {
+  let t0 = null;
+  btn.onclick = () => {
+    if (!btn.classList.contains("armed")) {
+      btn.dataset.text = btn.textContent; btn.classList.add("armed"); btn.textContent = armedText();
+      t0 = setTimeout(() => { btn.classList.remove("armed"); btn.textContent = btn.dataset.text; }, 3000);
+      return;
+    }
+    clearTimeout(t0); btn.classList.remove("armed"); btn.textContent = btn.dataset.text; action();
+  };
+}
+$("mode-auto").onclick = () => { mode = "auto"; renderDest(); };
+$("mode-folder").onclick = () => { mode = "folder"; renderDest(); };
+$("collapse").onclick = () => { expanded.clear(); expanded.add(""); renderTree(); };
+$("mkdir").onclick = () => {
+  const name = $("newdir").value.trim(); if (!name) return setStatus("", true, T[lang].err.name_needed);
+  const path = join(target, name);
+  post("/api/folders/" + encPath(path), {}).then(() => { $("newdir").value = ""; expanded.add(target); target = path; return loadTree(); })
+    .catch(e => setStatus("", true, errText(e)));
+};
+$("newdir").onkeydown = e => { if (e.key === "Enter") $("mkdir").click(); };
+
+function upload(file, dir, replace) {
+  const row = Object.assign(document.createElement("div"), {className: "up"});
+  const stateEl = Object.assign(document.createElement("div"), {className: "state"});
+  const to = Object.assign(document.createElement("div"), {className: "to"});
+  to.innerHTML = ICON.folder; to.append(folderTitle(dir));
+  row.append(Object.assign(document.createElement("div"), {className: "name", textContent: file.name}), stateEl, to);
+  $("uploads").prepend(row);
+  const say = (text, cls) => { stateEl.innerHTML = ""; stateEl.append(Object.assign(document.createElement("span"), {textContent: text, className: cls || ""})); };
+  const askReplace = () => {
+    say(t("up_there"));
+    const b = Object.assign(document.createElement("button"), {type: "button", className: "x", textContent: t("up_replace")});
+    b.onclick = () => { row.remove(); upload(file, dir, true); };
+    stateEl.append(b);
+  };
+  if (!replace && hasFile(dir, file.name)) return askReplace();
+  const bar = Object.assign(document.createElement("progress"), {max: 1, value: 0});
+  stateEl.append(bar);
+  const xhr = new XMLHttpRequest();
+  xhr.open("PUT", "/api/roms/" + encPath(join(dir, file.name)) + (replace ? "?replace=1" : ""));
+  xhr.upload.onprogress = e => { if (e.lengthComputable) bar.value = e.loaded / e.total; };
+  xhr.onload = () => {
+    let body = {}; try { body = JSON.parse(xhr.responseText); } catch (e) {}
+    if (xhr.status === 200) { say(t("up_done"), "good"); fresh.add(join(dir, file.name)); expanded.add(dir); loadTree(); }
+    else if (body.exists) askReplace();
+    else say(T[lang].err[body.code] || body.error || t("up_failed"), "bad");
+  };
+  xhr.onerror = () => say(t("up_stopped"), "bad");
+  xhr.send(file);
+}
+function uploadAll(files) {
+  const batch = [...files];
+  for (const f of batch) upload(f, destFor(f, batch), false);
+}
+$("files").onchange = e => { uploadAll(e.target.files); e.target.value = ""; };
+const drop = $("drop");
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); uploadAll(e.dataTransfer.files); };
+
+// ------------------------------------------------------------------ console
+let info = null;
+function fmtUptime(s) {
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return (d ? d + " " + T[lang].day + " " : "") + (h ? h + " h " : "") + m + " min";
+}
+function renderInfo() {
+  const dl = $("info"); dl.innerHTML = "";
+  if (!info) return;
+  const i = info, nf = new Intl.NumberFormat(lang, {maximumFractionDigits: 1, minimumFractionDigits: 1});
+  const rows = [
+    ["i_address", i.ip ? `http://${i.ip}${i.port === 80 ? "" : ":" + i.port}` : t("i_none")],
+    ["i_name", i.hostname],
+    ["i_menu", i.retroarch === "active" ? t("i_running") : t("i_stopped")],
+    ["i_temp", i.temp_c != null ? nf.format(i.temp_c) + " °C" : t("unknown")],
+    ["i_up", i.uptime_s != null ? fmtUptime(i.uptime_s) : t("unknown")],
+    ["i_free", i.drive && i.drive.mounted ? fmtSize(i.drive.free) : t("i_away")],
+  ];
+  for (const [k, v] of rows) dl.append(Object.assign(document.createElement("dt"), {textContent: t(k)}), Object.assign(document.createElement("dd"), {textContent: v}));
+}
+function loadInfo() {
+  api("/api/info").then(i => {
+    info = i; renderInfo();
+    const hasVol = i.volume != null;
+    $("volume").disabled = !hasVol;
+    if (hasVol && Date.now() - volInput > 1500) { $("volume").value = i.volume; $("vv").textContent = i.volume + " %"; }
+    if (!hasVol) $("vv").textContent = "–";
+    $("volume-note").hidden = hasVol;
+  }).catch(e => setStatus("", true, errText(e)));
+}
+let volTimer = null, volInput = 0;
+$("volume").oninput = e => {
+  volInput = Date.now(); $("vv").textContent = e.target.value + " %";
+  clearTimeout(volTimer);
+  volTimer = setTimeout(() => post("/api/volume", {volume: +e.target.value}).catch(err => setStatus("", true, errText(err))), 120);
+};
+for (const b of document.querySelectorAll("[data-power]")) {
+  armed(b, () => t("tap_again"), () => post("/api/power", {action: b.dataset.power}).then(() => setStatus("p_" + b.dataset.power))
+    .catch(e => setStatus("", true, errText(e))));
+}
+const KEYS = [["X", "k_menu"], ["L1 / R1", "k_state"], ["◀ / ▶", "k_slot"], ["▲ / ▼", "k_vol"], ["B", "k_reset"],
+              ["START", "k_quit"], ["L2 / R2", "k_bright"], ["Y", "k_leds"], ["A", "k_fx"], ["SELECT", "k_quick"]];
+function renderKeys() {
+  const dl = $("keys"); dl.innerHTML = "";
+  for (const [k, v] of KEYS) dl.append(Object.assign(document.createElement("dt"), {textContent: k}), Object.assign(document.createElement("dd"), {textContent: t(v)}));
+}
+
+// ------------------------------------------------------------------ language
+function applyLang() {
+  document.documentElement.lang = lang;
+  for (const el of document.querySelectorAll("[data-t]")) el.textContent = t(el.dataset.t);
+  for (const el of document.querySelectorAll("[data-t-aria]")) el.setAttribute("aria-label", t(el.dataset.tAria));
+  $("leds_on").setAttribute("aria-label", t("lights_on"));
+  $("color").setAttribute("aria-label", t("more_colours"));
+  if (statusKey) setStatus(statusKey, statusBad);
+  show(st); renderDest(); renderTree(); if (lastDrive) showDrive(lastDrive); renderInfo(); renderKeys();
+}
+window.addEventListener("languagechange", () => { lang = browserLang(); applyLang(); });
+
+applyLang();
+poll(); setInterval(poll, 5000);
+setInterval(() => { if (!$("panel-system").hidden) loadInfo(); }, 10000);
+openTab(location.hash.slice(1));
+window.addEventListener("hashchange", () => openTab(location.hash.slice(1)));
+</script>
+</body>
+</html>

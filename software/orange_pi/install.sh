@@ -9,7 +9,6 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-COMMON="$HERE/../common"
 U=${PITIN_USER:-${SUDO_USER:-}}
 ROM_SIZE=${ROM_SIZE:-4G}
 
@@ -77,8 +76,9 @@ systemctl disable --now serial-getty@ttyS0.service 2>/dev/null || true
 
 step "programs and settings"
 install -d /etc/pitin/autoconfig
-install -D -m 755 "$COMMON/pitin_leds.py" /usr/local/lib/pitin/pitin_leds.py
+install -D -m 755 "$HERE/pitin_leds.py" /usr/local/lib/pitin/pitin_leds.py
 ln -sf /usr/local/lib/pitin/pitin_leds.py /usr/local/bin/pitin-leds
+install -m 644 "$HERE/pitin-web.html" /usr/local/lib/pitin/pitin-web.html
 install -m 755 "$HERE/pitin-daemon" /usr/local/bin/pitin-daemon
 install -m 755 "$HERE/pitin-usbd" /usr/local/bin/pitin-usbd
 install -m 644 "$HERE/asound.conf" /etc/asound.conf
@@ -98,12 +98,29 @@ install -d -o "$U" -g "$(id -gn "$U")" "$MNT"
 grep -qF " $MNT vfat " /etc/fstab \
 	|| echo "$IMG $MNT vfat loop,uid=$(id -u "$U"),gid=$(id -g "$U"),umask=0022,nofail 0 0" >>/etc/fstab
 mountpoint -q "$MNT" || mount "$MNT"
+# One folder per console (the settings page sorts uploads into them by file type).
+for d in gb gbc gba nes snes megadrive mastersystem gamegear pcengine psx nds; do mkdir -p "$MNT/$d"; done
+OLD_PW=$(sed -n 's/^WEB_PASSWORD=//p' /etc/default/pitin 2>/dev/null || true)
+OLD_LANG=$(sed -n 's/^LANGUAGE=//p' /etc/default/pitin 2>/dev/null || true)
 cat >/etc/default/pitin <<EOF
 ROM_IMAGE=$IMG
 ROM_MOUNT=$MNT
 USB_MODE=auto
 WEB_PORT=8080
+# Password for the settings page (any user name); empty = no password.
+WEB_PASSWORD=$OLD_PW
+# Language of the on-screen messages and the hotkey list: en or fr; empty = the system's language.
+LANGUAGE=$OLD_LANG
 EOF
+# The hotkey list for SPECIAL + SELECT (a RetroArch overlay card), in the console's language.
+L=$OLD_LANG
+case "$L" in
+	en|fr) ;;
+	*) case "$(sed -n 's/^LANG=//p' /etc/default/locale 2>/dev/null | tr -d '"')" in fr*) L=fr ;; *) L=en ;; esac ;;
+esac
+install -d /etc/pitin/overlay
+install -m 644 "$HERE/overlay/help-card-$L.png" /etc/pitin/overlay/card.png
+install -m 644 "$HERE/overlay/pitin-menu.cfg" /etc/pitin/overlay/pitin-menu.cfg
 
 step "services"
 sed -e "s|@USER@|$U|g" -e "s|@HOME@|$H|g" -e "s|@RETROARCH@|$RETROARCH|g" \

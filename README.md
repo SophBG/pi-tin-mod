@@ -1,6 +1,6 @@
 # Pi Tin mod
 
-Personal build of jackw01's [Pi Tin](https://github.com/jackw01/pi-tin) (3D-printed clamshell version, KiCad 10). It adds 10 RGB LEDs under the buttons, a centred speaker, a USB-drive mode for the SD card, and ESD protection on USB. The upstream [build guides](https://jackw01.github.io/pi-tin/) still apply. License: CERN-OHL-W v2.
+Personal build of jackw01's [Pi Tin](https://github.com/jackw01/pi-tin) (3D-printed clamshell version, KiCad 10). It adds 10 RGB LEDs under the buttons, a centred speaker, a USB-drive mode for the ROMs, and ESD protection on USB, and runs on an Orange Pi Zero 2W. The upstream [build guides](https://jackw01.github.io/pi-tin/) still apply. License: CERN-OHL-W v2.
 
 ## Boards
 
@@ -17,11 +17,11 @@ Gerbers for both boards are in `fab/`.
 
 | Function | Parts | Notes |
 |---|---|---|
-| RGB LEDs | D1–D10 (WS2812B-2020) | Chain: D7 → D8 → D9 → D10 → D1 → … → D6 |
+| RGB LEDs | D1–D10 (WS2812B-2020) | Chain: D1 → D10. D1–D4 ABXY, D5 Start, D6 Select, D7–D10 D-pad. |
 | LED driver | U106 74AHCT1G125, R130 330 Ω | Input: SPI MOSI. Enabled only by the second SPI chip select on header pin 21, so the display (first chip select) never reaches the LEDs. |
 | | R131 10 k, R132 100 k | R131: buffer off at boot. R132: data line low. |
 | USB detect | R133/R134 100 k | VBUS divider to header pin 8 |
-| USB-drive mode | U107 USBLC6-2SC6, TP132 (D+), TP133 (D−) | Wire TP132/TP133 by hand to the Pi's USB D+/D− test pads. Optional. |
+| USB-drive mode | U107 USBLC6-2SC6, TP132 (D+), TP133 (D−) | Wire TP132/TP133 by hand to the Orange Pi's USB D+/D− (see Hardware notes). Optional. |
 | Backlight PWM | Header pins 16 and 18 swapped | Backlight on pin 16, UP on pin 18 (upstream: the other way round). Pin 16 is a hardware PWM on the Orange Pi. |
 
 **Footprints for both suppliers:**
@@ -71,34 +71,20 @@ Gerbers for both boards are in `fab/`.
 - **Battery:** 1-cell LiPo, about 2000 mAh, 8 × 38 × 60 mm, with protection circuit and a JST PH 2-pin plug, for example PKCell LP803860. The pocket is about 66.8 × 38.8 × 8 mm.
   - **Polarity:** J102 pin 1 is BAT+ (it goes to F101). Check that the red wire lands on it before plugging in.
 - **Shoulder buttons:** E-Switch TL3336AF160Q.
+- **Wi-Fi antenna:** 2.4/5 GHz flex (FPC) antenna with an **MHF4 (IPEX-4)** plug and 0.81 mm cable, flat part at most about 27 × 12 mm. The one that comes with the board fits the connector; use it if it is small enough. U.FL (MHF1) antennas don't fit this connector.
 
 ## 3D printing
 
-- **Faceplate:** `3d/faceplate/faceplate_v3_with_led_pockets.stl`. It is `v3.stl` with the LED pockets and collars merged.
-  - **To rebuild it:** open `faceplate_led_cuts.scad` with the three STLs in the same folder.
-  - **In Blender:** Union with the collars first, then Difference with the cutter, both with the Exact solver.
+- **Faceplate:** `3d/faceplate/faceplate_v3_with_led_pockets.stl`. It is `v3.stl` with the LED pockets and collars merged, plus:
+  - **Thicker skin:** most 0.8 mm panels are now 1.7 mm (`faceplate_thickening.stl`). That leaves 1.9 mm above the main board and 2.9 mm above the Orange Pi. The USB-C sits on the back, but its four shell legs come through: trim them flush on the front if they stick out more than 1.5 mm. Left as they were: the button rings, the LED pockets and light tunnels (with 0.5 mm around them), the Start/Select and side buttons, and the speaker.
+  - **Over the Orange Pi:** its parts were placed from Orange Pi's DXF of the board; they are in the same places as on the Pi Zero. The panels over the HDMI and the Wi-Fi module stay 0.8 mm. The pocket over the two USB-C leaves 3.4 mm (the connectors are about 3.2 mm).
+  - **ABXY LED pockets:** the collars left small gaps beside the cutter (and the one at the bottom right was open on one side); `faceplate_pocket_fill.stl` fills them, so each pocket is exactly the cutter's shape, like the D-pad ones.
+  - **Button key tabs:** the light tunnels end where the B (left and right) and Y (bottom) tabs are and had taken their lower 0.8 mm; the tabs are whole again. Light still passes beside and under them.
+  - **microSD closure:** 1.7 mm instead of 0.8 mm, leaving 2.9 mm above the Orange Pi for the card and its slot.
+  - **To rebuild it:** open `faceplate_led_cuts.scad` with the five STLs in the same folder.
+  - **In Blender:** Union with the collars, the pocket fill and the thickening first, then Difference with the cutter, then Union with the key tabs (in the `.scad`), all with the Exact solver.
 - **Lower case:** `3d/case/p101_lower_case_fixed.STL`.
 - **Display housing, bezel, buttons:** the upstream STL files.
-
-## Raspberry Pi Zero 2 W
-
-`config.txt`, on top of the standard Pi Tin setup:
-
-```
-dtoverlay=spi0-2cs,cs1_pin=9,no_miso   # replaces spi0-1cs; CE1 (GPIO9) gates the LED buffer
-core_freq_min=400                      # fixed SPI clock for the LED timing
-dtoverlay=dwc2,dr_mode=peripheral      # USB-drive mode
-gpio=14=ip,pn                          # USB cable detect
-```
-
-Pins 16 and 18 are swapped on this board (backlight on GPIO23, UP on GPIO24), so in the upstream software:
-- **`brightness_control.py`:** set `pin_backlight = 23`.
-- **GPIOnext:** after downloading `config.db`, run `sqlite3 GPIOnext/config/config.db "UPDATE GPIOnext SET pins='24' WHERE name='UP 1'"`.
-
-Files in `software/`:
-- **`software/common/pitin_leds.py`:** install it as `/usr/local/bin/pitin_leds.py`. It needs `python3-spidev` and uses `/dev/spidev0.1`. Usage: `demo`, `off` or `set R G B`.
-- **`software/raspberry_pi/pitin_usb_mode.sh`:** install it in `~/RetroPie/retropiemenu/`. The ROMs must be on their own FAT32 or exFAT partition (default `/dev/mmcblk0p3`, set by `ROMPART`/`MNT` in the script).
-- **`software/raspberry_pi/spidev1-on.dts`:** only needed if `/dev/spidev0.1` is missing.
 
 ## Orange Pi Zero 2W
 
@@ -125,23 +111,33 @@ What it sets up:
 - **RetroArch** starts on the screen at boot. There is no EmulationStation.
   - **Save states:** the game state is saved and restored automatically, including at power-off.
   - **Cores:** they come from the Debian packages. If the packaged RetroArch lacks KMS, `install.sh` builds it from source.
-- **ROM drive:** a FAT32 image (`~/roms.img`) mounted on `~/roms`. Plugged into a computer, it shows up there as a USB drive (`pitin-usbd`); a charger changes nothing.
+- **ROM drive:** a FAT32 image (`~/roms.img`) mounted on `~/roms`, with a folder per console. Plugged into a computer, it shows up there as a USB drive (`pitin-usbd`); a charger changes nothing.
 - **Sound:** both channels are mixed for the single amplifier. Set the volume with `amixer sset Master 60%`.
-- **`pitin-daemon`:** screen brightness, LED effects (off, static, breathing, rainbow, reactive) and a settings page at `http://<ip>:8080` for colour and both brightnesses. Settings are kept across reboots.
+- **`pitin-daemon`:** screen brightness, volume, the LEDs and a settings page at `http://<ip>:8080` (`pitin-web.html`). Settings are kept across reboots.
+  - **LED effects:** each LED has its own colour. Off, static (steady), wave (a rainbow, or the LEDs' own colours, travels from LED to LED in a chosen order), fade (all LEDs change colour together) and reactive (a pressed button lights the LEDs beside it: two for the D-pad and ABXY, its own side for the shoulders).
+  - **Settings page:** LEDs, uploading ROMs over Wi-Fi (sorted into the console folders by file type) and deleting them, screen brightness, volume, status, restart and power off. Works on a phone or a computer, in French or English depending on the browser's language.
+  - **Password:** the page is open to the local network. Set `WEB_PASSWORD=` in `/etc/default/pitin` and run `sudo systemctl restart pitin-daemon` to require one.
+  - **On-screen messages:** the daemon's hotkeys (screen brightness, volume, LEDs) show their value as RetroArch on-screen text; RetroArch's own hotkeys show RetroArch's messages. Volume is the same "Master" volume as on the settings page.
+  - **LED auto brightness:** on by default (switch on the settings page). The LEDs dim with the screen, so the screen brightness hotkey sets both; the LED brightness setting is then their maximum, at full screen brightness, and the page shows the brightness they have now.
+  - **Load, restart and quit:** SPECIAL + L1, + B and + START act only when held for a second, so a slip doesn't lose progress. Quitting saves the game state (`savestate_auto_save`), and it is loaded again when the game starts.
+  - **List of hotkeys:** SPECIAL + SELECT pauses the game and shows every SPECIAL hotkey on a card (a RetroArch overlay, `overlay/`). While it is open, the buttons do the same without SPECIAL (volume, brightness, LEDs, save, slot…); SELECT closes it.
+  - **Changing the card:** edit the texts or colours in `overlay/make_card.py` and run it, or edit the PNGs (320 × 240, transparent around the card) in any image editor; then run `install.sh` again.
+  - **How:** the messages, quit / reset and the card use RetroArch's network commands (UDP 55355, also reachable from the local network). Language: `LANGUAGE=` in `/etc/default/pitin` (`en` or `fr`; empty = the system's language), then run `install.sh` again for the card.
 
 Hotkeys (hold SPECIAL):
 
 | SPECIAL + | Action |
 |---|---|
 | X | RetroArch menu |
-| L1 / R1 | Load / save state |
+| L1 (hold 1 s) / R1 | Load / save state |
 | LEFT / RIGHT | Previous / next save slot |
 | UP / DOWN | Volume up / down |
-| B | Reset |
-| START | Quit the game |
+| B (hold 1 s) | Reset |
+| START (hold 1 s) | Quit the game (it is saved) |
 | L2 / R2 | Screen brightness down / up |
-| Y | LEDs on / off |
+| Y | LEDs on / off (they come back with the same effect) |
 | A | Next LED effect |
+| SELECT | List of hotkeys on the screen |
 
 Pins that change role:
 
@@ -161,3 +157,4 @@ Hardware notes:
 - **USB-drive mode:** TP132/TP133 must go to the D+/D− of the OTG USB-C port (USB0). The D+/D− pads under the board look like they belong to the host-only port; check with a multimeter.
 - **Top side:** the main PCB covers a strip of about 6 mm along the header, so nothing there may stick up.
 - **Bottom side:** it faces the battery and has an SPI flash chip about 1.5 mm tall. Use thicker foam or Kapton there.
+- **Wi-Fi antenna:** the Orange Pi Zero 2W has no antenna on the board, only an IPEX-4 (MHF4) connector next to the 24-pin FPC (ANT1 in the schematic), and without one there is no Wi-Fi. The faceplate has a pocket over that connector and a channel into the thin panel over the Wi-Fi module, for the plug and its cable. Stick a small flex antenna to the inside of that panel (room: about 27 × 12 mm) and coil the spare cable there. The boards are close, so the range is shorter than with the antenna outside the case: check it before closing the case.

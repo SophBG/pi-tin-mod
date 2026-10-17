@@ -4285,7 +4285,7 @@
 		(at 62 60.3 -135)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D5"
+		(property "Reference" "D9"
 			(at 0 -2.000001 225)
 			(layer "F.SilkS")
 			(hide yes)
@@ -4525,7 +4525,7 @@
 			(at -0.915 -0.55 225)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D5-DOUT)")
+			(net "Net-(D10-DIN)")
 			(pinfunction "DOUT_1")
 			(pintype "output")
 			(uuid "6eb5708c-a753-4e14-b54c-97c5f01c2b3e")
@@ -4543,7 +4543,7 @@
 			(at 0.915 0.55 225)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D4-DOUT)")
+			(net "Net-(D8-DOUT)")
 			(pinfunction "DIN_3")
 			(pintype "input")
 			(uuid "007e3021-a67f-4a63-9563-a6816c076ea2")
@@ -4576,7 +4576,7 @@
 		(at 76 74.3 45)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D3"
+		(property "Reference" "D7"
 			(at 0 -2.000001 45)
 			(layer "F.SilkS")
 			(hide yes)
@@ -4816,7 +4816,7 @@
 			(at -0.915 -0.55 45)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D3-DOUT)")
+			(net "Net-(D7-DOUT)")
 			(pinfunction "DOUT_1")
 			(pintype "output")
 			(uuid "49c22a49-c221-40a3-b6e6-6b77c2ee4460")
@@ -4834,7 +4834,7 @@
 			(at 0.915 0.55 45)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D2-DOUT)")
+			(net "Net-(D6-DOUT)")
 			(pinfunction "DIN_3")
 			(pintype "input")
 			(uuid "d4561987-3ca2-4a40-8748-4b54ef5b35be")
@@ -4867,7 +4867,7 @@
 		(at 97.5 72.55)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D1"
+		(property "Reference" "D5"
 			(at 0 -2.000001 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -5107,7 +5107,7 @@
 			(at -0.915 -0.55)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D1-DOUT)")
+			(net "Net-(D5-DOUT)")
 			(pinfunction "DOUT_1")
 			(pintype "output")
 			(uuid "14923e83-00fa-41e5-8563-7009188d781e")
@@ -7992,7 +7992,7 @@
 		(at 76 60.3 135)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D6"
+		(property "Reference" "D10"
 			(at 0 -2.000001 135)
 			(layer "F.SilkS")
 			(hide yes)
@@ -8232,7 +8232,7 @@
 			(at -0.915 -0.55 135)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "unconnected-(D6-DOUT-Pad1)")
+			(net "unconnected-(D10-DOUT-Pad1)")
 			(pinfunction "DOUT_1")
 			(pintype "output")
 			(uuid "121c9871-8bfe-42bd-9b0e-2b5698b5fb68")
@@ -8250,7 +8250,7 @@
 			(at 0.915 0.55 135)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D5-DOUT)")
+			(net "Net-(D10-DIN)")
 			(pinfunction "DIN_3")
 			(pintype "input")
 			(uuid "f3e1afb7-8cba-44f7-ada1-d902d6d40d58")
@@ -8481,7 +8481,7 @@
 		(at 111.4 74.3 -45)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D10"
+		(property "Reference" "D4"
 			(at 0 -2.000001 315)
 			(layer "F.SilkS")
 			(hide yes)
@@ -8739,7 +8739,7 @@
 			(at 0.915 0.55 315)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D10-DIN)")
+			(net "Net-(D3-DOUT)")
 			(pinfunction "DIN_3")
 			(pintype "input")
 			(uuid "617fe6a8-630c-4f7f-8dae-788f64319848")
@@ -8772,7 +8772,7 @@
 		(at 126.6 59.1 135)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D8"
+		(property "Reference" "D2"
 			(at 0 -2.000001 135)
 			(layer "F.SilkS")
 			(hide yes)
@@ -9012,7 +9012,7 @@
 			(at -0.915 -0.55 135)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D8-DOUT)")
+			(net "Net-(D2-DOUT)")
 			(pinfunction "DOUT_1")
 			(pintype "output")
 			(uuid "7643d3a6-0dc0-42ae-894d-a4c8c1682b6e")
@@ -9031,7 +9031,7 @@
 			(at 0.915 0.55 135)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D7-DOUT)")
+			(net "Net-(D1-DOUT)")
 			(pinfunction "DIN_3")
 			(pintype "input")
 			(uuid "9e8cdb51-ee15-4f1c-bad4-b3b896ae760b")
@@ -9152,7 +9152,7 @@
 		(at 126.5 74.3 45)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D9"
+		(property "Reference" "D3"
 			(at 0 -2.000001 45)
 			(layer "F.SilkS")
 			(hide yes)
@@ -9392,7 +9392,7 @@
 			(at -0.915 -0.55 45)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D10-DIN)")
+			(net "Net-(D3-DOUT)")
 			(pinfunction "DOUT_1")
 			(pintype "output")
 			(uuid "6e991815-413b-4771-a56a-014154b1b725")
@@ -9410,7 +9410,7 @@
 			(at 0.915 0.55 45)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D8-DOUT)")
+			(net "Net-(D2-DOUT)")
 			(pinfunction "DIN_3")
 			(pintype "input")
 			(uuid "47790a7f-2ffb-4741-af43-b7e120cdd332")
@@ -9826,7 +9826,7 @@
 		(at 62 74.3 -45)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D4"
+		(property "Reference" "D8"
 			(at 0 -2.000001 315)
 			(layer "F.SilkS")
 			(hide yes)
@@ -10066,7 +10066,7 @@
 			(at -0.915 -0.55 315)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D4-DOUT)")
+			(net "Net-(D8-DOUT)")
 			(pinfunction "DOUT_1")
 			(pintype "output")
 			(uuid "38207196-b9e8-45be-9253-979abd13c458")
@@ -10084,7 +10084,7 @@
 			(at 0.915 0.55 315)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D3-DOUT)")
+			(net "Net-(D7-DOUT)")
 			(pinfunction "DIN_3")
 			(pintype "input")
 			(uuid "56622a5a-664e-4eca-8d7a-08a26df1ec12")
@@ -12651,7 +12651,7 @@
 		(at 89.5 72.55)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D2"
+		(property "Reference" "D6"
 			(at 0 -2.000001 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -12891,7 +12891,7 @@
 			(at -0.915 -0.55)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D2-DOUT)")
+			(net "Net-(D6-DOUT)")
 			(pinfunction "DOUT_1")
 			(pintype "output")
 			(uuid "cfbd55a6-f1db-4a07-a6a5-786b42b092ba")
@@ -12909,7 +12909,7 @@
 			(at 0.915 0.55)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D1-DOUT)")
+			(net "Net-(D5-DOUT)")
 			(pinfunction "DIN_3")
 			(pintype "input")
 			(uuid "253450ad-f3d5-4beb-af2d-841a957d7fb8")
@@ -13688,7 +13688,7 @@
 		(at 111.4 59.1 -135)
 		(descr "2.0mm x 2.0mm Addressable RGB LED NeoPixel Nano, 12 mA, https://cdn-shop.adafruit.com/product-files/4684/4684_WS2812B-2020_V1.3_EN.pdf")
 		(tags "LED RGB NeoPixel Nano PLCC-4 2020")
-		(property "Reference" "D7"
+		(property "Reference" "D1"
 			(at 0 -2.000001 225)
 			(layer "F.SilkS")
 			(hide yes)
@@ -13928,7 +13928,7 @@
 			(at -0.915 -0.55 225)
 			(size 0.7 0.7)
 			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net "Net-(D7-DOUT)")
+			(net "Net-(D1-DOUT)")
 			(pinfunction "DOUT_1")
 			(pintype "output")
 			(uuid "6c537205-58aa-4ae5-960f-1c3c8ae13952")
@@ -702451,7 +702451,7 @@
 		(end 75.494418 59.016601)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D5-DOUT)")
+		(net "Net-(D10-DIN)")
 		(uuid "155aa285-3208-4ce2-9087-3d74a4af7793")
 	)
 	(segment
@@ -702459,7 +702459,7 @@
 		(end 64.061216 59.016601)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D5-DOUT)")
+		(net "Net-(D10-DIN)")
 		(uuid "1d570ee4-7288-4dd7-95ff-d59ac0e0b82e")
 	)
 	(segment
@@ -702467,7 +702467,7 @@
 		(end 75.741906 59.264089)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D5-DOUT)")
+		(net "Net-(D10-DIN)")
 		(uuid "1f1123f1-868d-4378-81ef-4076fd10eba1")
 	)
 	(segment
@@ -702475,7 +702475,7 @@
 		(end 61.741906 73.264089)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D4-DOUT)")
+		(net "Net-(D8-DOUT)")
 		(uuid "23fa2c13-7ce9-4ffe-9f31-5b99f2b40dfc")
 	)
 	(segment
@@ -702483,7 +702483,7 @@
 		(end 60.964089 60.558094)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D4-DOUT)")
+		(net "Net-(D8-DOUT)")
 		(uuid "3d60769b-5222-4bc0-afc7-372a046e5b2c")
 	)
 	(segment
@@ -702491,7 +702491,7 @@
 		(end 60.716601 72.238784)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D4-DOUT)")
+		(net "Net-(D8-DOUT)")
 		(uuid "5b950d0b-2888-4237-baab-62fe20c5d119")
 	)
 	(segment
@@ -702499,7 +702499,7 @@
 		(end 60.716601 60.805582)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D4-DOUT)")
+		(net "Net-(D8-DOUT)")
 		(uuid "c443760b-62b8-4fd4-9f76-be1a5919d5cd")
 	)
 	(via
@@ -702507,7 +702507,7 @@
 		(size 0.6)
 		(drill 0.3)
 		(layers "F.Cu" "B.Cu")
-		(net "Net-(D4-DOUT)")
+		(net "Net-(D8-DOUT)")
 		(uuid "bd9acccc-300c-43b0-90b9-00c9cc730f39")
 	)
 	(via
@@ -702515,7 +702515,7 @@
 		(size 0.6)
 		(drill 0.3)
 		(layers "F.Cu" "B.Cu")
-		(net "Net-(D4-DOUT)")
+		(net "Net-(D8-DOUT)")
 		(uuid "d7b92168-99f2-4598-9f23-895f70d13d58")
 	)
 	(segment
@@ -702523,7 +702523,7 @@
 		(end 60.716601 66)
 		(width 0.2)
 		(layer "B.Cu")
-		(net "Net-(D4-DOUT)")
+		(net "Net-(D8-DOUT)")
 		(uuid "d67ff52d-c6c5-4927-9985-c2d266c4a6ee")
 	)
 	(segment
@@ -704241,7 +704241,7 @@
 		(end 62.258094 75.335911)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D3-DOUT)")
+		(net "Net-(D7-DOUT)")
 		(uuid "16f75442-9136-4e32-9678-69321ce7d5f8")
 	)
 	(segment
@@ -704249,7 +704249,7 @@
 		(end 70.305582 74.805582)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D3-DOUT)")
+		(net "Net-(D7-DOUT)")
 		(uuid "221a985a-f25a-4618-afdc-3936c99b334c")
 	)
 	(segment
@@ -704257,7 +704257,7 @@
 		(end 68.9 73.4)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D3-DOUT)")
+		(net "Net-(D7-DOUT)")
 		(uuid "4f756446-0364-4eeb-b01d-98c458de9ea7")
 	)
 	(segment
@@ -704265,7 +704265,7 @@
 		(end 63.5 75.5)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D3-DOUT)")
+		(net "Net-(D7-DOUT)")
 		(uuid "73c6d05e-27c4-4014-871d-3718e0a22888")
 	)
 	(segment
@@ -704273,7 +704273,7 @@
 		(end 65.6 73.4)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D3-DOUT)")
+		(net "Net-(D7-DOUT)")
 		(uuid "bf68ff44-c196-4e5d-8a47-ea8ea4462959")
 	)
 	(segment
@@ -704281,7 +704281,7 @@
 		(end 62.422183 75.5)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D3-DOUT)")
+		(net "Net-(D7-DOUT)")
 		(uuid "d8270ccb-87d6-41ab-a6f9-79d3f2d06ac8")
 	)
 	(segment
@@ -704289,7 +704289,7 @@
 		(end 74.716601 74.805582)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D3-DOUT)")
+		(net "Net-(D7-DOUT)")
 		(uuid "da59beee-a724-4f03-8dfa-86d811c6d199")
 	)
 	(segment
@@ -704297,7 +704297,7 @@
 		(end 77.035911 74.041906)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D2-DOUT)")
+		(net "Net-(D6-DOUT)")
 		(uuid "1c6df670-4b8e-4cb6-94b8-de0d8f4f15a4")
 	)
 	(segment
@@ -704305,7 +704305,7 @@
 		(end 77.977817 73.1)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D2-DOUT)")
+		(net "Net-(D6-DOUT)")
 		(uuid "269c8896-7bf2-45d1-99d0-e2a512c2261f")
 	)
 	(segment
@@ -704313,7 +704313,7 @@
 		(end 88.385 72)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D2-DOUT)")
+		(net "Net-(D6-DOUT)")
 		(uuid "a4724c0c-7000-4f53-b11b-d566c94c2f98")
 	)
 	(segment
@@ -704321,7 +704321,7 @@
 		(end 87.285 73.1)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D2-DOUT)")
+		(net "Net-(D6-DOUT)")
 		(uuid "cce5720e-62d2-4269-8cc2-4d9bd790cfd1")
 	)
 	(segment
@@ -704329,7 +704329,7 @@
 		(end 91.715 72)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D1-DOUT)")
+		(net "Net-(D5-DOUT)")
 		(uuid "12d4b8c5-cf2c-4a79-9fdc-0eb8a46529a3")
 	)
 	(segment
@@ -704337,7 +704337,7 @@
 		(end 90.615 73.1)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D1-DOUT)")
+		(net "Net-(D5-DOUT)")
 		(uuid "84a2642a-e70d-4395-a821-ea5922af1278")
 	)
 	(segment
@@ -704345,7 +704345,7 @@
 		(end 90.415 73.1)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D1-DOUT)")
+		(net "Net-(D5-DOUT)")
 		(uuid "a161b8a0-3393-4c47-9b4c-abaec3127da9")
 	)
 	(segment
@@ -705793,7 +705793,7 @@
 		(end 124.122183 75.9)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D10-DIN)")
+		(net "Net-(D3-DOUT)")
 		(uuid "3442781c-498e-4ce0-a39f-d95ea174804b")
 	)
 	(segment
@@ -705801,7 +705801,7 @@
 		(end 125.464089 74.558094)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D10-DIN)")
+		(net "Net-(D3-DOUT)")
 		(uuid "7705b88f-3b2e-457e-9f7c-9343bbca28a6")
 	)
 	(segment
@@ -705809,7 +705809,7 @@
 		(end 113.352941 74.9)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D10-DIN)")
+		(net "Net-(D3-DOUT)")
 		(uuid "8392122b-a34f-4685-a519-70adecdb07bc")
 	)
 	(segment
@@ -705817,7 +705817,7 @@
 		(end 119.351471 75.9)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D10-DIN)")
+		(net "Net-(D3-DOUT)")
 		(uuid "9af0b896-a353-4efa-acb3-9eaa8ac1c4c1")
 	)
 	(segment
@@ -705825,7 +705825,7 @@
 		(end 112.669542 75.583399)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D10-DIN)")
+		(net "Net-(D3-DOUT)")
 		(uuid "aca31d1b-dc9a-40f8-adf5-ceaaf53241b0")
 	)
 	(segment
@@ -705833,7 +705833,7 @@
 		(end 111.905582 75.583399)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D10-DIN)")
+		(net "Net-(D3-DOUT)")
 		(uuid "c34cd7cb-4ac0-4268-891c-87898644a55f")
 	)
 	(segment
@@ -705841,7 +705841,7 @@
 		(end 118.351471 74.9)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D10-DIN)")
+		(net "Net-(D3-DOUT)")
 		(uuid "daf9656d-d56d-472a-8cc0-353aaed1f53e")
 	)
 	(segment
@@ -705849,7 +705849,7 @@
 		(end 126.858094 69.858094)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D8-DOUT)")
+		(net "Net-(D2-DOUT)")
 		(uuid "0352dba4-ad4a-4314-a6d5-ac5d036a86ca")
 	)
 	(segment
@@ -705857,7 +705857,7 @@
 		(end 128 73.577817)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D8-DOUT)")
+		(net "Net-(D2-DOUT)")
 		(uuid "41dc7c17-3422-4784-8d15-13e678c65574")
 	)
 	(segment
@@ -705865,7 +705865,7 @@
 		(end 127.535911 74.041906)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D8-DOUT)")
+		(net "Net-(D2-DOUT)")
 		(uuid "757a1a2f-68db-4d28-864f-72d7fca9dca7")
 	)
 	(segment
@@ -705873,7 +705873,7 @@
 		(end 128 71)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D8-DOUT)")
+		(net "Net-(D2-DOUT)")
 		(uuid "7866162a-2079-451f-98af-0864dfe1ac50")
 	)
 	(segment
@@ -705881,7 +705881,7 @@
 		(end 120.6 57.6)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D7-DOUT)")
+		(net "Net-(D1-DOUT)")
 		(uuid "119dde40-477c-4099-aad3-3226210a1d9b")
 	)
 	(segment
@@ -705889,7 +705889,7 @@
 		(end 112.435911 58.346931)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D7-DOUT)")
+		(net "Net-(D1-DOUT)")
 		(uuid "1bf0ee55-ce27-4d4b-bda2-b75e9984834c")
 	)
 	(segment
@@ -705897,7 +705897,7 @@
 		(end 115.282842 55.5)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D7-DOUT)")
+		(net "Net-(D1-DOUT)")
 		(uuid "4297dc44-2ea0-4a98-af28-6d68f6a7e080")
 	)
 	(segment
@@ -705905,7 +705905,7 @@
 		(end 118.5 55.5)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D7-DOUT)")
+		(net "Net-(D1-DOUT)")
 		(uuid "6cf5080b-0b34-460c-aed5-c7a717e85572")
 	)
 	(segment
@@ -705913,7 +705913,7 @@
 		(end 125.877817 57.6)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D7-DOUT)")
+		(net "Net-(D1-DOUT)")
 		(uuid "d2c50169-6569-485c-bdaa-7696f192d01b")
 	)
 	(segment
@@ -705921,7 +705921,7 @@
 		(end 126.341906 58.064089)
 		(width 0.2)
 		(layer "F.Cu")
-		(net "Net-(D7-DOUT)")
+		(net "Net-(D1-DOUT)")
 		(uuid "dafa322b-1c77-4d85-8496-345835d0dec6")
 	)
 	(segment

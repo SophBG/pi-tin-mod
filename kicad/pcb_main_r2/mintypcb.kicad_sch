@@ -18061,7 +18061,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "580ff1eb-d434-424b-90c3-1d62a81c937a")
-		(property "Reference" "D7"
+		(property "Reference" "D1"
 			(at 153.162 263.398 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18131,7 +18131,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D7")
+					(reference "D1")
 					(unit 1)
 				)
 			)
@@ -18993,7 +18993,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "5f7180bc-a67d-4b42-905e-80153982c926")
-		(property "Reference" "D3"
+		(property "Reference" "D7"
 			(at 173.482 232.918 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19063,7 +19063,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D3")
+					(reference "D7")
 					(unit 1)
 				)
 			)
@@ -19184,7 +19184,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "61d9f4da-9690-4163-a62f-cb9c1b1e5a18")
-		(property "Reference" "D2"
+		(property "Reference" "D6"
 			(at 153.162 232.918 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19254,7 +19254,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D2")
+					(reference "D6")
 					(unit 1)
 				)
 			)
@@ -21018,7 +21018,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "752d2ef6-b5b9-4141-ab34-299fe613ecce")
-		(property "Reference" "D6"
+		(property "Reference" "D10"
 			(at 132.842 263.398 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21088,7 +21088,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D6")
+					(reference "D10")
 					(unit 1)
 				)
 			)
@@ -21947,7 +21947,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "7c587bd5-f3b5-4e5b-9d2e-7b379135a3a3")
-		(property "Reference" "D1"
+		(property "Reference" "D5"
 			(at 132.842 232.918 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22017,7 +22017,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D1")
+					(reference "D5")
 					(unit 1)
 				)
 			)
@@ -25350,7 +25350,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "a3bd1a2c-5ab9-4150-9322-eb4eef60f9a9")
-		(property "Reference" "D5"
+		(property "Reference" "D9"
 			(at 214.122 232.918 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25420,7 +25420,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D5")
+					(reference "D9")
 					(unit 1)
 				)
 			)
@@ -25764,7 +25764,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "aae704b6-b3ba-4f3c-8a65-85ba83fd632e")
-		(property "Reference" "D9"
+		(property "Reference" "D3"
 			(at 193.802 263.398 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25834,7 +25834,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D9")
+					(reference "D3")
 					(unit 1)
 				)
 			)
@@ -27354,7 +27354,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "bd20e19c-6d82-45b5-b9aa-5d2cb2822d36")
-		(property "Reference" "D4"
+		(property "Reference" "D8"
 			(at 193.802 232.918 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -27424,7 +27424,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D4")
+					(reference "D8")
 					(unit 1)
 				)
 			)
@@ -29277,7 +29277,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "cf83caca-8775-4844-9f40-4a33ec14053c")
-		(property "Reference" "D8"
+		(property "Reference" "D2"
 			(at 173.482 263.398 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29347,7 +29347,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D8")
+					(reference "D2")
 					(unit 1)
 				)
 			)
@@ -31965,7 +31965,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f8e85c49-62aa-4198-89a7-454f5ccbeb13")
-		(property "Reference" "D10"
+		(property "Reference" "D4"
 			(at 214.122 263.398 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32035,7 +32035,7 @@
 		(instances
 			(project "mintypcb"
 				(path "/c809f0b5-674b-425f-afd3-ebaa2d8ff300"
-					(reference "D10")
+					(reference "D4")
 					(unit 1)
 				)
 			)
