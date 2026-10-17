@@ -1,0 +1,370 @@
+#!/usr/bin/env python3
+"""Pi Tin daemon for the Orange Pi Zero 2W (runs as root, pitin-daemon.service).
+
+* Screen brightness: hold HOTKEY and press L2 / R2 (hold to keep changing), or use the web
+  page. It sets the kernel backlight (/sys/class/backlight/pitin-backlight, hardware PWM on
+  header pin 16), whose scale is already perceptual.
+* RGB LEDs: effects off / static / breathing / rainbow / reactive (the LEDs next to a button
+  light up when it is pressed). HOTKEY + Y turns them on and off, HOTKEY + A changes effect.
+* Web page on port 8080 (http://<ip>:8080) to choose effect, colour and both brightnesses.
+* Settings are kept in /var/lib/pitin/state.json.
+The other hotkeys (save/load state, volume, menu, reset, exit) are RetroArch's.
+"""
+import colorsys
+import glob
+import json
+import math
+import os
+import re
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import evdev
+from evdev import ecodes as E
+
+sys.path.insert(0, '/usr/local/lib/pitin')
+import pitin_leds  # noqa: E402
+
+STATE_FILE = '/var/lib/pitin/state.json'
+BACKLIGHT_DIR = '/sys/class/backlight'
+GAMEPAD = 'Pi Tin Gamepad'
+EFFECTS = ['off', 'static', 'breathing', 'rainbow', 'reactive']
+LED_MAX_SCALE = 0.4          # 100 % on the slider = 40 % of the LEDs' full power
+FPS = 30
+
+# Which LEDs sit next to which buttons (PCB references, see pitin_leds.py).
+GROUPS = {
+    E.BTN_START: ['D1'], E.BTN_SELECT: ['D2'],
+    E.BTN_DPAD_UP: ['D3', 'D4', 'D5', 'D6'], E.BTN_DPAD_DOWN: ['D3', 'D4', 'D5', 'D6'],
+    E.BTN_DPAD_LEFT: ['D3', 'D4', 'D5', 'D6'], E.BTN_DPAD_RIGHT: ['D3', 'D4', 'D5', 'D6'],
+    E.BTN_SOUTH: ['D7', 'D8', 'D9', 'D10'], E.BTN_EAST: ['D7', 'D8', 'D9', 'D10'],
+    E.BTN_NORTH: ['D7', 'D8', 'D9', 'D10'], E.BTN_WEST: ['D7', 'D8', 'D9', 'D10'],
+    E.BTN_TL: pitin_leds.CHAIN, E.BTN_TR: pitin_leds.CHAIN,
+    E.BTN_TL2: pitin_leds.CHAIN, E.BTN_TR2: pitin_leds.CHAIN,
+}
+HOTKEY = E.BTN_MODE
+
+lock = threading.Lock()
+state = {'effect': 'static', 'color': '#ff7a1a', 'leds_on': True, 'led_brightness': 50, 'screen': 100}
+dirty = threading.Event()
+flash = {}                   # LED ref -> intensity 0..1 for the reactive effect
+
+
+def log(*a):
+    print(*a, flush=True)
+
+
+# ---------------------------------------------------------------- settings
+def load_state():
+    try:
+        with open(STATE_FILE) as f:
+            update(json.load(f), save=False)
+    except (OSError, ValueError):
+        pass
+
+
+def update(changes, save=True):
+    """Apply validated changes; returns the new state."""
+    with lock:
+        if changes.get('effect') in EFFECTS:
+            state['effect'] = changes['effect']
+        if isinstance(changes.get('color'), str) and re.fullmatch(r'#[0-9a-fA-F]{6}', changes['color']):
+            state['color'] = changes['color'].lower()
+        if isinstance(changes.get('leds_on'), bool):
+            state['leds_on'] = changes['leds_on']
+        for key, lo in (('led_brightness', 0), ('screen', 10)):
+            if isinstance(changes.get(key), (int, float)):
+                state[key] = int(max(lo, min(100, changes[key])))
+        snapshot = dict(state)
+    if save and 'screen' in changes:
+        write_backlight(snapshot['screen'])
+    if save:
+        dirty.set()
+    return snapshot
+
+
+def saver():
+    while True:
+        dirty.wait()
+        time.sleep(2)
+        dirty.clear()
+        with lock:
+            data = json.dumps(state, indent=1)
+        os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        tmp = STATE_FILE + '.tmp'
+        with open(tmp, 'w') as f:
+            f.write(data)
+        os.replace(tmp, STATE_FILE)
+
+
+_backlight_warned = False
+
+
+def write_backlight(level):
+    """level 10..100 % -> the backlight's brightness (pwm-backlight's default curve is perceptual)."""
+    global _backlight_warned
+    paths = sorted(glob.glob(BACKLIGHT_DIR + '/*'), key=lambda p: 'pitin' not in p)
+    if not paths:
+        if not _backlight_warned:
+            log('no backlight in', BACKLIGHT_DIR, '(overlay or PWM driver missing?)')
+            _backlight_warned = True
+        return
+    try:
+        with open(paths[0] + '/max_brightness') as f:
+            top = int(f.read())
+        with open(paths[0] + '/brightness', 'w') as f:
+            f.write(f'{max(1, round(level / 100 * top))}\n')
+    except (OSError, ValueError) as e:
+        log('backlight:', e)
+
+
+# ---------------------------------------------------------------- LEDs
+def hex_rgb(h):
+    return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def render_loop():
+    try:
+        leds = pitin_leds.Leds()
+    except (SystemExit, OSError) as e:      # no /dev/spidev*.1: run without LEDs
+        log('LEDs disabled:', e)
+        return
+    pitin_leds.BRIGHTNESS = 1.0          # scaling is done here
+    last, last_t = None, 0.0
+    t0 = time.monotonic()
+    while True:
+        now = time.monotonic()
+        t = now - t0
+        with lock:
+            s = dict(state)
+        scale = s['led_brightness'] / 100 * LED_MAX_SCALE
+        base = hex_rgb(s['color'])
+        chain = pitin_leds.CHAIN
+        if not s['leds_on'] or s['effect'] == 'off':
+            frame = {}
+        elif s['effect'] == 'static':
+            frame = {ref: base for ref in chain}
+        elif s['effect'] == 'breathing':
+            k = 0.12 + 0.88 * (0.5 - 0.5 * math.cos(2 * math.pi * t / 3.0))
+            frame = {ref: tuple(c * k for c in base) for ref in chain}
+        elif s['effect'] == 'rainbow':
+            frame = {}
+            for i, ref in enumerate(chain):
+                r, g, b = colorsys.hsv_to_rgb((t / 6.0 + i / len(chain)) % 1.0, 1, 1)
+                frame[ref] = (r * 255, g * 255, b * 255)
+        else:                                 # reactive
+            with lock:
+                for ref in list(flash):
+                    flash[ref] *= 0.82
+                    if flash[ref] < 0.02:
+                        del flash[ref]
+                frame = {ref: tuple(c * k for c in base) for ref, k in flash.items()}
+
+        out = [tuple(int(c * scale) for c in frame.get(ref, (0, 0, 0))) for ref in chain]
+        if out != last or now - last_t > 5:   # static frames are refreshed every 5 s
+            leds.show(out)
+            last, last_t = out, now
+        time.sleep(max(0.0, 1 / FPS - (time.monotonic() - now)))
+
+
+# ---------------------------------------------------------------- buttons
+class Repeater:
+    """Brightness steps while HOTKEY + L2/R2 are held: one step, then every 80 ms after 0.5 s."""
+
+    def __init__(self):
+        self.step = 0
+        self.gen = 0
+        self.cv = threading.Condition()
+        threading.Thread(target=self.run, daemon=True).start()
+
+    def start(self, step):
+        with self.cv:
+            self.step, self.gen = step, self.gen + 1
+            self.cv.notify()
+
+    def stop(self):
+        with self.cv:
+            self.step, self.gen = 0, self.gen + 1
+            self.cv.notify()
+
+    def run(self):
+        while True:
+            with self.cv:
+                while not self.step:
+                    self.cv.wait()
+                step, gen = self.step, self.gen
+            update({'screen': state['screen'] + step})
+            delay = 0.5
+            while True:
+                with self.cv:
+                    self.cv.wait(delay)
+                    if self.gen != gen or not self.step:
+                        break
+                update({'screen': state['screen'] + step})
+                delay = 0.08
+
+
+def button_loop():
+    repeater = Repeater()
+    while True:
+        dev = None
+        while dev is None:
+            for path in evdev.list_devices():
+                d = evdev.InputDevice(path)
+                if d.name == GAMEPAD:
+                    dev = d
+                    break
+                d.close()
+            if dev is None:
+                time.sleep(2)
+        log('buttons:', dev.path)
+        held = set()
+        try:
+            for ev in dev.read_loop():
+                if ev.type != E.EV_KEY:
+                    continue
+                if ev.value == 1:
+                    held.add(ev.code)
+                    with lock:
+                        for ref in GROUPS.get(ev.code, []):
+                            flash[ref] = 1.0
+                    if HOTKEY in held and ev.code != HOTKEY:
+                        if ev.code == E.BTN_TL2:
+                            repeater.start(-5)
+                        elif ev.code == E.BTN_TR2:
+                            repeater.start(+5)
+                        elif ev.code == E.BTN_WEST:            # Y
+                            update({'leds_on': not state['leds_on']})
+                        elif ev.code == E.BTN_EAST:            # A
+                            nxt = EFFECTS[(EFFECTS.index(state['effect']) + 1) % len(EFFECTS)]
+                            update({'effect': nxt, 'leds_on': True})
+                elif ev.value == 0:
+                    held.discard(ev.code)
+                    if ev.code in (E.BTN_TL2, E.BTN_TR2, HOTKEY):
+                        repeater.stop()
+        except OSError:
+            log('gamepad lost, searching again')
+            time.sleep(1)
+
+
+# ---------------------------------------------------------------- web page
+PAGE = r'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pi Tin</title>
+<style>
+:root{--bg:#f4f1ec;--card:#fff;--ink:#1d1b19;--muted:#6f6a64;--accent:#e2602a;--line:#e3ded6}
+@media (prefers-color-scheme:dark){:root{--bg:#161514;--card:#211f1d;--ink:#f1ede7;--muted:#a39d95;--line:#34312d}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif}
+main{max-width:420px;margin:0 auto;padding:24px 16px}h1{font-size:22px;margin:0 0 4px}
+p.sub{margin:0 0 20px;color:var(--muted);font-size:14px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+.fx{display:flex;flex-wrap:wrap;gap:8px}
+.fx button{flex:1 1 30%;padding:10px 6px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink);font:inherit;cursor:pointer}
+.fx button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.row{display:flex;align-items:center;gap:12px;margin-top:12px}.row label{flex:0 0 96px;color:var(--muted);font-size:14px}
+input[type=range]{flex:1;accent-color:var(--accent)}input[type=color]{width:56px;height:36px;border:none;background:none;padding:0}
+.val{width:40px;text-align:right;font-variant-numeric:tabular-nums}
+.sw{display:flex;align-items:center;justify-content:space-between}
+.sw input{width:44px;height:24px;accent-color:var(--accent)}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}.swatches span{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid var(--line)}
+</style></head><body><main>
+<h1>Pi Tin</h1><p class="sub">LEDs and screen. Changes apply right away and are kept.</p>
+<section><div class="sw"><h2 style="margin:0">LEDs</h2><input type="checkbox" id="leds_on"></div>
+<div class="fx" id="fx" style="margin-top:14px"></div>
+<div class="row"><label>Colour</label><input type="color" id="color"><div class="swatches" id="sw"></div></div>
+<div class="row"><label>Brightness</label><input type="range" id="led_brightness" min="0" max="100" step="5"><span class="val" id="lb"></span></div>
+</section>
+<section><h2>Screen</h2>
+<div class="row"><label>Brightness</label><input type="range" id="screen" min="10" max="100" step="5"><span class="val" id="sb"></span></div>
+</section>
+<p class="sub">On the console: hold HOTKEY and press L2/R2 for screen brightness, Y to switch the LEDs on or off, A for the next effect.</p>
+</main><script>
+const EFFECTS=["off","static","breathing","rainbow","reactive"],SW=["#ff7a1a","#ff2d55","#7c4dff","#2f80ff","#00c2a8","#ffffff"];
+const $=id=>document.getElementById(id);let st={},timer;
+function show(s){st=s;$("leds_on").checked=s.leds_on;$("color").value=s.color;$("led_brightness").value=s.led_brightness;$("lb").textContent=s.led_brightness+"%";
+$("screen").value=s.screen;$("sb").textContent=s.screen+"%";for(const b of $("fx").children)b.classList.toggle("on",b.dataset.e===s.effect)}
+function send(ch){clearTimeout(timer);timer=setTimeout(()=>fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(ch)}).then(r=>r.json()).then(show),60)}
+for(const e of EFFECTS){const b=document.createElement("button");b.textContent=e[0].toUpperCase()+e.slice(1);b.dataset.e=e;b.onclick=()=>send({effect:e,leds_on:true});$("fx").appendChild(b)}
+for(const c of SW){const s=document.createElement("span");s.style.background=c;s.onclick=()=>send({color:c});$("sw").appendChild(s)}
+$("leds_on").onchange=e=>send({leds_on:e.target.checked});$("color").oninput=e=>send({color:e.target.value});
+$("led_brightness").oninput=e=>{$("lb").textContent=e.target.value+"%";send({led_brightness:+e.target.value})};
+$("screen").oninput=e=>{$("sb").textContent=e.target.value+"%";send({screen:+e.target.value})};
+fetch("/api/state").then(r=>r.json()).then(show);setInterval(()=>fetch("/api/state").then(r=>r.json()).then(show),5000);
+</script></body></html>'''
+
+
+class Handler(BaseHTTPRequestHandler):
+    def reply(self, code, body, ctype):
+        data = body.encode()
+        self.send_response(code)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(len(data)))
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self):
+        if self.path == '/':
+            self.reply(200, PAGE, 'text/html; charset=utf-8')
+        elif self.path == '/api/state':
+            with lock:
+                self.reply(200, json.dumps(state), 'application/json')
+        else:
+            self.reply(404, 'not found', 'text/plain')
+
+    def do_POST(self):
+        if self.path != '/api/state':
+            return self.reply(404, 'not found', 'text/plain')
+        try:
+            n = min(int(self.headers.get('Content-Length', 0)), 4096)
+            changes = json.loads(self.rfile.read(n) or b'{}')
+            if not isinstance(changes, dict):
+                raise ValueError
+        except ValueError:
+            return self.reply(400, 'bad request', 'text/plain')
+        self.reply(200, json.dumps(update(changes)), 'application/json')
+
+    def log_message(self, *a):
+        pass
+
+
+def web_port():
+    try:
+        for line in open('/etc/default/pitin'):
+            k, _, v = line.strip().partition('=')
+            if k == 'WEB_PORT':
+                return int(v)
+    except (OSError, ValueError):
+        pass
+    return 8080
+
+
+def restore_backlight():
+    """pwm-backlight is a module and may appear after this daemon starts."""
+    for _ in range(60):
+        if glob.glob(BACKLIGHT_DIR + '/*'):
+            break
+        time.sleep(0.5)
+    with lock:
+        level = state['screen']
+    write_backlight(level)
+
+
+def main():
+    load_state()
+    for target in (restore_backlight, saver, render_loop, button_loop):
+        threading.Thread(target=target, daemon=True).start()
+    port = web_port()
+    if port:
+        log('web page on port', port)
+        ThreadingHTTPServer(('', port), Handler).serve_forever()
+    else:
+        threading.Event().wait()
+
+
+if __name__ == '__main__':
+    main()

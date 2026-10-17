@@ -18,10 +18,11 @@ Gerbers for both boards are in `fab/`.
 | Function | Parts | Notes |
 |---|---|---|
 | RGB LEDs | D1–D10 (WS2812B-2020) | Chain: D7 → D8 → D9 → D10 → D1 → … → D6 |
-| LED driver | U106 74AHCT1G125, R130 330 Ω | Input: SPI MOSI. Enabled only by SPI CE1 (GPIO9), so the display (CE0) never reaches the LEDs. |
+| LED driver | U106 74AHCT1G125, R130 330 Ω | Input: SPI MOSI. Enabled only by the second SPI chip select on header pin 21, so the display (first chip select) never reaches the LEDs. |
 | | R131 10 k, R132 100 k | R131: buffer off at boot. R132: data line low. |
-| USB detect | R133/R134 100 k | VBUS divider to GPIO14 |
+| USB detect | R133/R134 100 k | VBUS divider to header pin 8 |
 | USB-drive mode | U107 USBLC6-2SC6, TP132 (D+), TP133 (D−) | Wire TP132/TP133 by hand to the Pi's USB D+/D− test pads. Optional. |
+| Backlight PWM | Header pins 16 and 18 swapped | Backlight on pin 16, UP on pin 18 (upstream: the other way round). Pin 16 is a hardware PWM on the Orange Pi. |
 
 **Footprints for both suppliers:**
 - **J101:** HCTL HC-TYPE-C-16P-01A or GCT USB4105-GF-A.
@@ -90,32 +91,73 @@ dtoverlay=dwc2,dr_mode=peripheral      # USB-drive mode
 gpio=14=ip,pn                          # USB cable detect
 ```
 
-- **`pitin_leds.py`:** install it in `/usr/local/bin/`. It needs `python3-spidev` and uses `/dev/spidev0.1`. Usage: `demo`, `off` or `set R G B`.
-- **`pitin_usb_mode.sh`:** install it in `~/RetroPie/retropiemenu/`. The ROMs must be on their own FAT32 or exFAT partition (default `/dev/mmcblk0p3`, set by `ROMPART`/`MNT` in the script).
-- **`spidev1-on.dts`:** only needed if `/dev/spidev0.1` is missing.
+Pins 16 and 18 are swapped on this board (backlight on GPIO23, UP on GPIO24), so in the upstream software:
+- **`brightness_control.py`:** set `pin_backlight = 23`.
+- **GPIOnext:** after downloading `config.db`, run `sqlite3 GPIOnext/config/config.db "UPDATE GPIOnext SET pins='24' WHERE name='UP 1'"`.
 
-## Orange Pi Zero 2W (software not written yet)
+Files in `software/`:
+- **`software/common/pitin_leds.py`:** install it as `/usr/local/bin/pitin_leds.py`. It needs `python3-spidev` and uses `/dev/spidev0.1`. Usage: `demo`, `off` or `set R G B`.
+- **`software/raspberry_pi/pitin_usb_mode.sh`:** install it in `~/RetroPie/retropiemenu/`. The ROMs must be on their own FAT32 or exFAT partition (default `/dev/mmcblk0p3`, set by `ROMPART`/`MNT` in the script).
+- **`software/raspberry_pi/spidev1-on.dts`:** only needed if `/dev/spidev0.1` is missing.
 
-The boards need no changes: power, SPI (pins 19/21/23/24) and I2S (pins 12/35/40) are on the same header pins.
+## Orange Pi Zero 2W
+
+`software/orange_pi/` sets everything up on Armbian (Debian, "current" kernel). The sound and backlight drivers are Armbian kernel patches, so mainline kernels won't work. Do the Armbian first-boot setup over SSH, then:
+
+```
+cd software/orange_pi
+sudo ./install.sh            # ROM_SIZE=16G sudo ./install.sh for a bigger ROM drive
+sudo reboot
+sudo ./check.sh --test       # status, then backlight, LEDs, sound and buttons
+```
+
+What it sets up:
+- **Overlay `pitin-opi-zero2w.dts`:**
+  - display: `mi0283qt` driver on SPI1 CS0 at 50 MHz, `rotation = <90>` (use 270 if the picture is upside down);
+  - backlight: PWM4 at 20 kHz, as `/sys/class/backlight/pitin-backlight`;
+  - LEDs: spidev on CS1, with PH8 as the chip select;
+  - sound: I2S0 to the MAX98357A, through the Armbian kernel's AHUB driver;
+  - the 15 buttons as one gamepad;
+  - power button: systemd powers off;
+  - power-off line on pin 5;
+  - USB cable detect;
+  - UART0 off.
+- **RetroArch** starts on the screen at boot. There is no EmulationStation.
+  - **Save states:** the game state is saved and restored automatically, including at power-off.
+  - **Cores:** they come from the Debian packages. If the packaged RetroArch lacks KMS, `install.sh` builds it from source.
+- **ROM drive:** a FAT32 image (`~/roms.img`) mounted on `~/roms`. Plugged into a computer, it shows up there as a USB drive (`pitin-usbd`); a charger changes nothing.
+- **Sound:** both channels are mixed for the single amplifier. Set the volume with `amixer sset Master 60%`.
+- **`pitin-daemon`:** screen brightness, LED effects (off, static, breathing, rainbow, reactive) and a settings page at `http://<ip>:8080` for colour and both brightnesses. Settings are kept across reboots.
+
+Hotkeys (hold SPECIAL):
+
+| SPECIAL + | Action |
+|---|---|
+| X | RetroArch menu |
+| L1 / R1 | Load / save state |
+| LEFT / RIGHT | Previous / next save slot |
+| UP / DOWN | Volume up / down |
+| B | Reset |
+| START | Quit the game |
+| L2 / R2 | Screen brightness down / up |
+| Y | LEDs on / off |
+| A | Next LED effect |
+
+Pins that change role:
 
 | Pin | Pi Tin use | On the Orange Pi |
 |---|---|---|
-| 5 | `SHUTDOWN_PS`: power-off output to the power circuit | PI7: gpio-poweroff, active low |
-| 8 / 10 | `USB_PWR` (USB detect) / RIGHT button | UART0 debug console: disable it. Don't hold RIGHT at boot. |
-| 18 | `RST`: display reset, also the backlight switch on the display board (`RS/BL`) | Plain GPIO. Dimming would need the `pwm-gpio` driver. |
-| 21 | `LED_CS`: GPIO9, used as SPI CE1 to gate the LEDs | PH8: CS for the LED spidev (`cs-gpios`) |
-| 26 | `SHUTDOWN_PI`: power button | PH9, which is also SPI1 CS1: keep it as a plain GPIO |
+| 5 | `SHUTDOWN_PS`: power-off output | PI7: gpio-poweroff, active low |
+| 8 / 10 | `USB_PWR` (USB detect) / RIGHT | PH0 / PH1: the UART0 debug console, disabled by the overlay. U-Boot still uses it, so don't hold RIGHT while booting. |
+| 12 / 35 / 40 | I2S BCLK / LRCLK / DATA | PI1 / PI2 / PI3 (I2S0) |
+| 16 | Backlight PWM (`RS/BL` on the display board) | PI14: PWM4 |
+| 18 | UP | PH4: plain input |
+| 21 | `LED_CS`: gates the LED buffer | PH8 as a GPIO chip select (`cs-gpios`) |
+| 26 | `SHUTDOWN_PI`: power button | PH9, which is also SPI1 CS1: used as a plain input |
 
-- **Overlay contents:**
-  - ILI9341 on SPI1 CS0;
-  - an spidev for the LEDs on CS1 (PH8);
-  - I2S0 with the MAX98357A;
-  - the 15 buttons as gpio-keys;
-  - the power button (PH9);
-  - gpio-poweroff (PI7);
-  - UART0 off.
-- **I2S audio:** needs the Orange Pi vendor kernel (6.1) or a kernel with the AHUB patches.
-- **USB-drive mode:** only the corner USB-C port (USB0) can be a USB device. Check with a multimeter which port the board's D+/D− pads belong to before wiring TP132/TP133.
-- **Clearance:**
-  - **Top:** the main PCB covers a strip of about 6 mm along the header, so nothing there may stick up.
-  - **Bottom:** it faces the battery and has an SPI flash chip about 1.5 mm tall. Use thicker foam or Kapton there.
+**Not tested on hardware.** Sound is the least certain part: it relies on the AHUB driver and on overlay settings reported working on this board on the DietPi forum. `check.sh` shows which part failed. `install.sh` stops if the overlay doesn't apply to the board's device tree.
+
+Hardware notes:
+- **USB-drive mode:** TP132/TP133 must go to the D+/D− of the OTG USB-C port (USB0). The D+/D− pads under the board look like they belong to the host-only port; check with a multimeter.
+- **Top side:** the main PCB covers a strip of about 6 mm along the header, so nothing there may stick up.
+- **Bottom side:** it faces the battery and has an SPI flash chip about 1.5 mm tall. Use thicker foam or Kapton there.

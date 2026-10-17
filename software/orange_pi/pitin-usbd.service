@@ -1,0 +1,11 @@
+[Unit]
+Description=Pi Tin: USB-drive mode when a computer is connected
+After=local-fs.target systemd-udevd.service
+
+[Service]
+ExecStart=/usr/local/bin/pitin-usbd
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

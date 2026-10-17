@@ -11229,7 +11229,7 @@
 		)
 		(uuid "fe7749d6-7168-4969-bc81-e9824616e10a")
 	)
-	(label "RST"
+	(label "UP"
 		(at 88.9 161.29 0)
 		(effects
 			(font
@@ -11439,7 +11439,7 @@
 		)
 		(uuid "5b387510-75c8-489e-9b6d-8283c8931c21")
 	)
-	(label "UP"
+	(label "RST"
 		(at 88.9 158.75 0)
 		(effects
 			(font

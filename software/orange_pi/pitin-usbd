@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Pi Tin USB-drive mode for the Orange Pi Zero 2W (runs as root, pitin-usbd.service).
+
+When a USB cable is plugged into the Pi Tin (header pin 8, reported by the overlay as
+SW_USB_INSERT on the "Pi Tin System" input device), the board offers an empty USB drive.
+  * A computer enumerates it within a few seconds: RetroArch is stopped (it saves state),
+    the ROM image is unmounted and handed to the computer.
+    Unplugging the cable checks the image, mounts it again and restarts RetroArch.
+  * A charger never enumerates it: nothing changes.
+
+Settings in /etc/default/pitin: ROM_IMAGE, ROM_MOUNT, USB_MODE=auto|off.
+TP132/TP133 must be wired to the D+/D- of the Orange Pi's OTG USB-C port (USB0).
+"""
+import fcntl
+import glob
+import os
+import subprocess
+import sys
+import time
+
+import evdev
+from evdev import ecodes
+
+CONF = '/etc/default/pitin'
+SERVICE = 'pitin-retroarch.service'
+DEVICE_NAME = 'Pi Tin System'
+ENUM_TIMEOUT = 6.0      # seconds a computer gets to enumerate the drive
+TTY = '/dev/tty1'         # the built-in screen while RetroArch is stopped
+
+
+def log(*a):
+    print(*a, flush=True)
+
+
+def config():
+    c = {'ROM_IMAGE': '', 'ROM_MOUNT': '', 'USB_MODE': 'auto'}
+    try:
+        with open(CONF) as f:
+            for line in f:
+                k, _, v = line.strip().partition('=')
+                if k in c:
+                    c[k] = v.strip().strip('"')
+    except OSError:
+        pass
+    return c
+
+
+def run(*cmd, check=False):
+    r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if r.returncode and check:
+        log('failed:', ' '.join(cmd), r.stdout.strip())
+    return r.returncode == 0
+
+
+def clear_screen():
+    """With RetroArch stopped the console shows old boot messages: keep the screen black."""
+    try:
+        with open(TTY, 'w') as f:
+            f.write('\033c\033[?25l')      # reset, hide the cursor
+    except OSError:
+        pass
+
+
+def find_device():
+    while True:
+        for path in evdev.list_devices():
+            d = evdev.InputDevice(path)
+            if d.name == DEVICE_NAME:
+                return d
+            d.close()
+        time.sleep(2)
+
+
+def cable(dev):
+    """Current SW_USB_INSERT state (EVIOCGSW)."""
+    buf = bytearray(8)
+    req = (2 << 30) | (len(buf) << 16) | (ord('E') << 8) | 0x1b
+    fcntl.ioctl(dev.fd, req, buf)
+    return bool(buf[ecodes.SW_USB_INSERT // 8] >> (ecodes.SW_USB_INSERT % 8) & 1)
+
+
+def udc_state():
+    for p in glob.glob('/sys/class/udc/*/state'):
+        try:
+            return open(p).read().strip()
+        except OSError:
+            pass
+    return ''
+
+
+def lun_dir():
+    for udc in glob.glob('/sys/class/udc/*'):
+        hits = glob.glob(os.path.realpath(udc + '/device') + '/gadget*/lun0')
+        if hits:
+            return hits[0]
+    return None
+
+
+def write(path, value):
+    try:
+        with open(path, 'w') as f:
+            f.write(value)
+        return True
+    except OSError as e:
+        log('write', path, e)
+        return False
+
+
+def wait_unplugged(dev):
+    while cable(dev):
+        time.sleep(0.5)
+
+
+def usb_session(dev, c):
+    if not run('modprobe', 'g_mass_storage', 'removable=1', 'stall=0', check=True):
+        return
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < ENUM_TIMEOUT and cable(dev) and udc_state() != 'configured':
+        time.sleep(0.25)
+    if udc_state() != 'configured':
+        log('no computer on the cable (charger)')
+        run('modprobe', '-r', 'g_mass_storage')
+        return
+
+    log('computer connected: entering USB-drive mode')
+    run('systemctl', 'stop', SERVICE)
+    clear_screen()
+    run('sync')
+    for _ in range(10):
+        if not os.path.ismount(c['ROM_MOUNT']) or run('umount', c['ROM_MOUNT']):
+            break
+        time.sleep(1)
+    lun = lun_dir()
+    if os.path.ismount(c['ROM_MOUNT']) or not lun or not write(lun + '/file', c['ROM_IMAGE']):
+        log('could not hand the ROM image over')
+        wait_unplugged(dev)
+    else:
+        wait_unplugged(dev)
+        write(lun + '/forced_eject', '1')
+
+    log('cable unplugged: back to normal mode')
+    run('modprobe', '-r', 'g_mass_storage')
+    run('fsck.vfat', '-a', c['ROM_IMAGE'])
+    if not os.path.ismount(c['ROM_MOUNT']):
+        run('mount', c['ROM_MOUNT'], check=True)
+    run('systemctl', 'start', SERVICE)
+
+
+def main():
+    c = config()
+    if c['USB_MODE'] != 'auto':
+        log('USB_MODE is not "auto": idle')
+        while True:
+            time.sleep(3600)
+    if not (os.path.isfile(c['ROM_IMAGE']) and c['ROM_MOUNT']):
+        sys.exit('ROM_IMAGE/ROM_MOUNT not set in ' + CONF)
+    dev = find_device()
+    log('watching', dev.path)
+    while True:
+        if cable(dev):
+            usb_session(dev, c)
+        for ev in dev.read_loop():
+            if ev.type == ecodes.EV_SW and ev.code == ecodes.SW_USB_INSERT and ev.value:
+                break
+
+
+if __name__ == '__main__':
+    main()

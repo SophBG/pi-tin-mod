@@ -1,0 +1,26 @@
+# Template: install.sh fills in @USER@, @HOME@ and @RETROARCH@.
+[Unit]
+Description=Pi Tin: RetroArch on the built-in screen
+After=systemd-user-sessions.service sound.target local-fs.target
+After=getty@tty1.service
+Conflicts=getty@tty1.service
+
+[Service]
+User=@USER@
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+WorkingDirectory=@HOME@
+ExecStart=@RETROARCH@ --appendconfig=/etc/pitin/retroarch-pitin.cfg
+Restart=always
+RestartSec=2
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
