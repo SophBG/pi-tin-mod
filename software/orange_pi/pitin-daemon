@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Pi Tin daemon for the Orange Pi Zero 2W (runs as root, pitin-daemon.service).
+"""Pi Tin daemon for the Orange Pi Zero 2W (runs as root, pitin-daemon.service). By SophBG:
+https://github.com/SophBG
 
 * Screen brightness: hold SPECIAL and press L2 / R2 (hold to keep changing), or use the web
   page. It sets the kernel backlight (/sys/class/backlight/pitin-backlight, hardware PWM on
@@ -15,19 +16,26 @@
   the buttons do their hotkeys without SPECIAL. The hotkeys show their values as RetroArch's on-screen text.
 * SPECIAL + START (quit the game), B (restart it) and L1 (load the saved state) act only when held for a
   second.
-* Web page on port 8080 (pitin-web.html): LEDs, uploading and managing ROMs, screen brightness,
-  volume, status and power. Optional password: WEB_PASSWORD in /etc/default/pitin.
+* Web page on port 80, or 8080 if 80 is taken (WEB_PORT in /etc/default/pitin; pitin-web.html): LEDs, uploading
+  and managing ROMs, screen brightness, volume, status, the console's name on the network and power.
+* Optional console's OK for the page, switched on in the page itself: when a new phone or computer opens it, the
+  console pauses the game and asks (an overlay card: hold A to let it in, B says no).
+* The page by name: http://<name>.local through avahi-daemon (mDNS), and http://<name> on Windows through the
+  LLMNR answers here (UDP 5355); routers that keep DHCP names also find http://<name>.
 * Settings are kept in /var/lib/pitin/state.json.
 The other hotkeys (save state, slot, menu) are RetroArch's, with its own messages.
 """
-import base64
 import colorsys
 import glob
+import hashlib
 import hmac
+import http.cookies
 import json
 import os
 import re
+import secrets
 import socket
+import struct
 import unicodedata
 import subprocess
 import sys
@@ -92,7 +100,7 @@ def log(*a):
 
 
 def config():
-    c = {'ROM_MOUNT': '', 'WEB_PORT': '8080', 'WEB_PASSWORD': '', 'LANGUAGE': ''}
+    c = {'ROM_MOUNT': '', 'WEB_PORT': '80', 'LANGUAGE': ''}
     try:
         with open(CONF) as f:
             for line in f:
@@ -310,15 +318,28 @@ RA_PORT = 55355              # RetroArch's network commands (network_cmd_enable 
 WORDS = {   # capitals only: RetroArch's on-screen font may not have accents
     'en': {'effect': 'LED EFFECT', 'screen': 'SCREEN BRIGHTNESS', 'volume': 'VOLUME',
            'leds_on': 'LEDS ON', 'leds_off': 'LEDS OFF',
-           'hold_quit': 'HOLD START TO QUIT THE GAME', 'hold_reset': 'HOLD B TO RESTART THE GAME',
-           'hold_load': 'HOLD L1 TO LOAD THE SAVED STATE',
+           'hold_quit': 'HOLD START TO QUIT', 'hold_reset': 'HOLD B TO RESTART',
+           'hold_load': 'HOLD L1 TO LOAD',
+           'ask': '{device} ASKS TO OPEN THE SETTINGS PAGE', 'ask_ok': 'SETTINGS PAGE: LET IN',
+           'ask_no': 'SETTINGS PAGE: NOT LET IN', 'hold_a': 'HOLD A TO LET IT IN',
+           'devices': {'iphone': 'IPHONE', 'ipad': 'IPAD', 'android': 'ANDROID', 'windows': 'WINDOWS PC', 'mac': 'MAC',
+                       'chromebook': 'CHROMEBOOK', 'linux': 'LINUX PC', 'other': 'A DEVICE'},
            'effects': {'off': 'OFF', 'static': 'STATIC', 'wave': 'WAVE', 'fade': 'FADE', 'reactive': 'REACTIVE'}},
     'fr': {'effect': 'EFFET LED', 'screen': 'LUMINOSITE ECRAN', 'volume': 'VOLUME',
            'leds_on': 'LEDS ALLUMEES', 'leds_off': 'LEDS ETEINTES',
-           'hold_quit': 'MAINTENIR START POUR QUITTER LE JEU', 'hold_reset': 'MAINTENIR B POUR RECOMMENCER LE JEU',
-           'hold_load': 'MAINTENIR L1 POUR CHARGER LA SAUVEGARDE',
+           'hold_quit': 'MAINTENIR START POUR QUITTER', 'hold_reset': 'MAINTENIR B POUR RECOMMENCER',
+           'hold_load': 'MAINTENIR L1 POUR CHARGER',
+           'ask': '{device} DEMANDE A OUVRIR LA PAGE DE REGLAGES', 'ask_ok': 'PAGE DE REGLAGES : AUTORISE',
+           'ask_no': 'PAGE DE REGLAGES : REFUSE', 'hold_a': 'MAINTENIR A POUR AUTORISER',
+           'devices': {'iphone': 'IPHONE', 'ipad': 'IPAD', 'android': 'ANDROID', 'windows': 'PC WINDOWS', 'mac': 'MAC',
+                       'chromebook': 'CHROMEBOOK', 'linux': 'PC LINUX', 'other': 'UN APPAREIL'},
            'effects': {'off': 'ETEINT', 'static': 'FIXE', 'wave': 'VAGUE', 'fade': 'FONDU', 'reactive': 'REACTIF'}},
 }
+
+
+def overlay_next(n):
+    for _ in range(n):                              # RetroArch reads them all before its next frame
+        retroarch('OVERLAY_NEXT')
 
 
 def retroarch(cmd, reply=False):
@@ -414,9 +435,10 @@ def change(item, step):
 
 
 class HotkeyList:
-    """SPECIAL + SELECT: pauses the game and shows the list of hotkeys, a card drawn by RetroArch's overlay (switched
-    with OVERLAY_NEXT: overlay 0 is empty, overlay 1 the card). The gamepad is grabbed meanwhile so that RetroArch
-    doesn't see the presses (Buttons does the hotkeys without SPECIAL); SELECT closes it."""
+    """SPECIAL + SELECT: pauses the game and shows the list of hotkeys, a card drawn by RetroArch's overlay. The
+    overlay's cards (overlay/pitin-menu.cfg) are 0: none, 1: this list, 2: the question when a browser asks to be let
+    in; OVERLAY_NEXT goes to the next one, and from the last back to 0. The gamepad is grabbed meanwhile so that
+    RetroArch doesn't see the presses (Buttons does the hotkeys without SPECIAL); SELECT closes it."""
 
     def __init__(self):
         self.is_open = False
@@ -431,7 +453,7 @@ class HotkeyList:
         self.paused = retroarch('GET_STATUS', reply=True).startswith('GET_STATUS PLAYING')
         if self.paused:
             retroarch('PAUSE_TOGGLE')
-        retroarch('OVERLAY_NEXT')                       # the card
+        overlay_next(1)                                 # 0 -> 1: the list
 
     def close(self, dev):
         self.is_open = False
@@ -439,7 +461,7 @@ class HotkeyList:
             dev.ungrab()
         except OSError:
             pass
-        retroarch('OVERLAY_NEXT')                       # back to the empty overlay
+        overlay_next(2)                                 # 1 -> 2 -> 0: no card
         if self.paused and retroarch('GET_STATUS', reply=True).startswith('GET_STATUS PAUSED'):
             retroarch('PAUSE_TOGGLE')
         self.paused = False
@@ -464,6 +486,10 @@ class Buttons:
         self.presses = {}
         self.opening = self.closing = False
         self.then = None                                    # a RetroArch command to send once the list closes
+        self.mx = threading.RLock()                         # key events, web requests and timers
+        self.events = 0                                     # presses and releases so far
+        self.asking = self.ask_waiting = self.ask_leaving = self.ask_paused = False
+        self.ask_until, self.ask_round, self.ask_device = 0.0, 0, 'other'
 
     def stepper(self, item, step):
         first = True
@@ -509,6 +535,16 @@ class Buttons:
             self.then, self.closing = 'MENU_TOGGLE', True
 
     def key(self, code, value):
+        if value not in (0, 1):
+            return
+        with self.mx:
+            self.events += 1
+            if self.asking:
+                self.ask_key(code, value)
+            else:
+                self.game_key(code, value)
+
+    def game_key(self, code, value):
         if value == 1:
             self.held.add(code)
             self.presses[code] = self.presses.get(code, 0) + 1
@@ -535,13 +571,111 @@ class Buttons:
                     if self.then:
                         retroarch(self.then)
                         self.then = None
+                if self.ask_waiting and not self.card.is_open:
+                    self.start_ask()
+
+    # A phone or computer asks to be let in (letting in, below): the controls are taken as for the hotkey list and
+    # the question card shown; A held for a second lets it in, B says no.
+    def ask(self, device):
+        with self.mx:
+            self.ask_device = device
+            if self.asking:
+                self.ask_until = time.monotonic() + ASK_TIME
+            elif self.held or self.card.is_open:
+                self.ask_waiting = True                     # once every button is released, or the list closed
+            else:
+                self.start_ask()
+
+    def start_ask(self):
+        self.asking, self.ask_waiting, self.ask_leaving = True, False, False
+        self.ask_until, self.ask_round = time.monotonic() + ASK_TIME, self.ask_round + 1
+        try:
+            self.dev.grab()
+        except OSError as e:
+            log('letting in: cannot grab the gamepad:', e)
+        self.ask_paused = retroarch('GET_STATUS', reply=True).startswith('GET_STATUS PLAYING')
+        if self.ask_paused:
+            retroarch('PAUSE_TOGGLE')
+        overlay_next(2)                                     # 0 -> 1 -> 2: the question
+        threading.Thread(target=self.ask_notice, args=(self.ask_round,), daemon=True).start()
+
+    def ask_notice(self, round_):
+        """Which device asks, as on-screen text under the card (each message lasts about 3 s), until the time is up."""
+        w = self.osd.words
+        while True:
+            with self.mx:
+                if not self.asking or self.ask_leaving or self.ask_round != round_:
+                    return
+                if time.monotonic() > self.ask_until:
+                    with auth_lock:
+                        for rid in [r for r, a in asks.items() if not a['ok']]:
+                            del asks[rid]
+                    self.leave_ask()
+                    return
+                device = w['devices'][self.ask_device]
+            retroarch('SHOW_MSG ' + w['ask'].format(device=device))
+            time.sleep(3.5)
+
+    def ask_key(self, code, value):
+        if value == 0:
+            self.held.discard(code)
+            if self.ask_leaving and not self.held:
+                self.leave_ask()
+            return
+        self.held.add(code)
+        with lock:
+            for ref in GROUPS.get(code, []):
+                flash[ref] = 1.0
+        if self.ask_leaving:
+            return
+        if code == E.BTN_EAST:                              # A: yes, once held for a second
+            self.osd.say(self.osd.words['hold_a'])
+            threading.Timer(self.HOLD, self.answer, (True, self.events)).start()
+        elif code == E.BTN_SOUTH:                           # B: no
+            self.answer(False, self.events)
+
+    def answer(self, yes, events):
+        with self.mx:
+            if not self.asking or self.ask_leaving or self.events != events:   # A released or another press since
+                return
+            with auth_lock:
+                for rid, a in list(asks.items()):
+                    if not a['ok']:
+                        if yes:
+                            a['ok'] = True
+                        else:
+                            del asks[rid]
+            self.osd.say(self.osd.words['ask_ok' if yes else 'ask_no'])
+            self.ask_leaving = True                         # the controls go back once the buttons are released
+            if not self.held:
+                self.leave_ask()
+
+    def leave_ask(self):
+        """Gives the controls back to the game, once no button is down."""
+        if self.held:
+            self.ask_leaving = True
+            return
+        self.asking = self.ask_leaving = False
+        try:
+            self.dev.ungrab()
+        except OSError:
+            pass
+        overlay_next(1)                                     # 2 -> 0: no card
+        if self.ask_paused and retroarch('GET_STATUS', reply=True).startswith('GET_STATUS PAUSED'):
+            retroarch('PAUSE_TOGGLE')
+        self.ask_paused = False
 
     def lost(self):
         self.repeater.stop()
         self.held.clear()
+        if self.asking:
+            self.asking = self.ask_leaving = False
+            overlay_next(1)
+            if self.ask_paused:
+                retroarch('PAUSE_TOGGLE')
         if self.card.is_open:
             self.card.is_open = False
-            retroarch('OVERLAY_NEXT')
+            overlay_next(2)
             if self.card.paused:
                 retroarch('PAUSE_TOGGLE')
                 self.card.paused = False
@@ -562,11 +696,13 @@ def button_loop():
                 time.sleep(2)
         log('buttons:', dev.path)
         buttons = Buttons(dev, repeater, card, osd)
+        set_console_buttons(buttons)
         try:
             for ev in dev.read_loop():
                 if ev.type == E.EV_KEY:
                     buttons.key(ev.code, ev.value)
         except OSError:
+            set_console_buttons(None)
             buttons.lost()
             log('gamepad lost, searching again')
             time.sleep(1)
@@ -610,9 +746,10 @@ def drive():
 
 
 def info():
-    d = {'hostname': socket.gethostname(), 'ip': local_ip(), 'port': int(CFG['WEB_PORT'] or 8080),
+    d = {'hostname': socket.gethostname(), 'ip': local_ip(), 'port': web_port,
          'volume': get_volume(), 'drive': drive(),
-         'retroarch': run('systemctl', 'is-active', 'pitin-retroarch.service').stdout.strip()}
+         'retroarch': run('systemctl', 'is-active', 'pitin-retroarch.service').stdout.strip(),
+         'protected': os.path.exists(SESSIONS_FILE)}
     try:
         with open('/sys/class/thermal/thermal_zone0/temp') as f:
             d['temp_c'] = round(int(f.read()) / 1000, 1)
@@ -628,6 +765,115 @@ def info():
 
 POWER = {'retroarch': ['systemctl', 'restart', 'pitin-retroarch.service'],
          'reboot': ['systemctl', 'reboot'], 'poweroff': ['systemctl', 'poweroff']}
+
+HOSTNAME = re.compile(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?')     # one DNS label, lower case
+HOSTS, HOSTNAME_FILE = '/etc/hosts', '/etc/hostname'
+
+
+def set_hostname(name):
+    """The console's name on the network: as hostnamectl sets it, and in /etc/hosts in place of the old one."""
+    old = socket.gethostname()
+    if name == old:
+        return
+    r = run('hostnamectl', 'set-hostname', name)
+    if r.returncode != 0:                           # no systemd-hostnamed: what it would do
+        with open(HOSTNAME_FILE, 'w') as f:
+            f.write(name + '\n')
+        if run('hostname', name).returncode != 0:
+            raise Refused(500, 'failed', 'Could not rename the console: ' + r.stdout.strip())
+    try:
+        with open(HOSTS) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        lines = []
+    found = False
+    for i, line in enumerate(lines):
+        addr, sep, comment = line.partition('#')
+        fields = addr.split()
+        if len(fields) < 2:
+            continue
+        names = [name + n[len(old):] if n == old or n.startswith(old + '.') else n for n in fields[1:]]
+        found |= name in names
+        if names != fields[1:]:
+            lines[i] = fields[0] + '\t' + ' '.join(names) + (' #' + comment if sep else '')
+    if not found:                                   # the console must find its own name (sudo warns otherwise)
+        at = next((i + 1 for i, line in enumerate(lines) if line.split()[:1] == ['127.0.0.1']), 0)
+        lines.insert(at, '127.0.1.1\t' + name)
+    with open(HOSTS + '.pitin', 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+    os.chmod(HOSTS + '.pitin', 0o644)
+    os.replace(HOSTS + '.pitin', HOSTS)
+    run('systemctl', 'try-restart', 'avahi-daemon.service')     # name.local, if avahi is installed
+    log('console renamed:', old, '->', name)
+
+
+# ---------------------------------------------------------------- letting a phone or computer in
+# With this switched on, SESSIONS_FILE lists the browsers let in (hashes of their cookies); without the file, the
+# page is open to the local network. A new browser asks (POST /api/ask): the console pauses the game, takes the
+# controls and shows a card asking whether to let it in, with the kind of device under it (Buttons.ask); A held
+# for a second says yes, B no. One browser at a time, so the answer can only go to the one named on the screen.
+SESSIONS_FILE = '/var/lib/pitin/sessions.json'
+COOKIE = 'pitin'
+ASK_TIME = 60
+auth_lock = threading.Lock()
+asks = {}                     # request id -> {'until': monotonic time, 'ok': bool}
+console_buttons = None        # the gamepad's Buttons, once found
+
+
+def device_kind(user_agent):
+    for word, kind in (('iPhone', 'iphone'), ('iPad', 'ipad'), ('Android', 'android'), ('CrOS', 'chromebook'),
+                       ('Windows', 'windows'), ('Macintosh', 'mac'), ('Linux', 'linux')):
+        if word in user_agent:
+            return kind
+    return 'other'
+
+
+def set_console_buttons(b):
+    global console_buttons
+    console_buttons = b
+
+
+def read_json(path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def write_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + '.tmp', 'w') as f:
+        json.dump(data, f)
+    os.chmod(path + '.tmp', 0o600)
+    os.replace(path + '.tmp', path)
+
+
+def token_hash(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def let_in(keep=True):
+    """One more browser let in (keep=False: the only one); returns its cookie header. The last 50 are kept."""
+    token = secrets.token_urlsafe(32)
+    write_json(SESSIONS_FILE, (read_json(SESSIONS_FILE, [])[-49:] if keep else []) + [token_hash(token)])
+    return {'Set-Cookie': f'{COOKIE}={token}; Max-Age=31536000; Path=/; HttpOnly; SameSite=Strict'}
+
+
+def new_ask(device):
+    """A browser asks to be let in: its id, or None while the console is answering another one."""
+    with auth_lock:
+        now = time.monotonic()
+        for rid in [r for r, a in asks.items() if now > a['until']]:
+            del asks[rid]
+        if any(not a['ok'] for a in asks.values()):
+            return None
+        rid = secrets.token_urlsafe(16)
+        asks[rid] = {'until': now + ASK_TIME + 5, 'ok': False}
+    b = console_buttons
+    if b:
+        b.ask(device)
+    return rid
 
 
 # ---------------------------------------------------------------- ROM drive
@@ -693,29 +939,32 @@ def page():
 
 
 class Handler(BaseHTTPRequestHandler):
-    def reply(self, code, body, ctype='application/json'):
+    OPEN = {'auth', 'ask', 'enter', 'logout'}      # the API calls that work without being let in
+
+    def reply(self, code, body, ctype='application/json', headers=None):
         data = (body if isinstance(body, str) else json.dumps(body)).encode()
         self.send_response(code)
         self.send_header('Content-Type', ctype)
         self.send_header('Content-Length', str(len(data)))
         self.send_header('Cache-Control', 'no-store')
-        if code == 401:
-            self.send_header('WWW-Authenticate', 'Basic realm="Pi Tin"')
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(data)
 
-    def authorized(self):
-        password = CFG['WEB_PASSWORD']
-        if not password:
-            return True
-        h = self.headers.get('Authorization', '')
-        if not h.startswith('Basic '):
-            return False
+    def token(self):
+        c = http.cookies.SimpleCookie()
         try:
-            given = base64.b64decode(h[6:]).decode().partition(':')[2]
-        except ValueError:
-            return False
-        return hmac.compare_digest(given.encode(), password.encode())
+            c.load(self.headers.get('Cookie', ''))
+        except http.cookies.CookieError:
+            return None
+        return c[COOKIE].value if COOKIE in c else None
+
+    def authorized(self):
+        if not os.path.exists(SESSIONS_FILE):
+            return True
+        t = self.token()
+        return bool(t) and token_hash(t) in read_json(SESSIONS_FILE, [])
 
     def body_json(self, limit=16384):
         n = int(self.headers.get('Content-Length') or 0)
@@ -730,19 +979,22 @@ class Handler(BaseHTTPRequestHandler):
         return data
 
     def route(self, method):
-        if not self.authorized():
-            return self.reply(401, {'code': 'password', 'error': 'Password needed.'})
         url = urllib.parse.urlsplit(self.path)
         path, query = urllib.parse.unquote(url.path), urllib.parse.parse_qs(url.query)
+        name = (path.strip('/').split('/') + [''])[1]
+        if path == '/ping':                         # the page checks which of its addresses work
+            return self.reply(200, {'ok': True})
+        if path == '/' and method == 'GET':         # the page itself asks the console if needed
+            return self.reply(200, page(), 'text/html; charset=utf-8')
+        if not (path.startswith('/api/') and name in self.OPEN) and not self.authorized():
+            return self.reply(401, {'code': 'locked', 'error': "This page needs the console's OK."})
         try:
-            handler = getattr(self, method.lower() + '_' + (path.strip('/').split('/') + [''])[1], None)
-            if path == '/' and method == 'GET':
-                return self.reply(200, page(), 'text/html; charset=utf-8')
+            handler = getattr(self, method.lower() + '_' + name, None)
             if not path.startswith('/api/') or not handler:
                 raise Refused(404, 'not_found', 'Not found.')
             sub = path[len('/api/'):].partition('/')[2]
-            code, body = handler(sub, query)
-            self.reply(code, body)
+            status, body, *headers = handler(sub, query)
+            self.reply(status, body, headers=headers[0] if headers else None)
         except Refused as e:
             self.reply(e.status, dict(e.extra, code=e.key, error=e.message))
         except OSError as e:
@@ -768,7 +1020,7 @@ class Handler(BaseHTTPRequestHandler):
     def post_state(self, sub, q):
         return 200, update(self.body_json())
 
-    # GET /api/info, POST /api/volume {volume}, POST /api/power {action}
+    # GET /api/info, POST /api/volume {volume}, POST /api/power {action}, POST /api/hostname {hostname}
     def get_info(self, sub, q):
         return 200, info()
 
@@ -786,6 +1038,61 @@ class Handler(BaseHTTPRequestHandler):
             raise Refused(400, 'bad_request', 'Unknown action.')
         threading.Timer(0.5, run, POWER[action]).start()
         return 200, {'ok': True}
+
+    def post_hostname(self, sub, q):
+        name = self.body_json().get('hostname')
+        if not isinstance(name, str) or not HOSTNAME.fullmatch(name) or name == 'localhost':
+            raise Refused(400, 'bad_hostname', 'Use letters a-z, numbers and hyphens (-), up to 63.')
+        set_hostname(name)
+        return 200, info()
+
+    # Letting in. GET /api/auth, POST /api/ask (the console asks), POST /api/enter {id} (let in yet?),
+    # POST /api/logout, POST /api/protect {on} (let in already: switches the console's OK on or off).
+    def get_auth(self, sub, q):
+        return 200, {'protected': os.path.exists(SESSIONS_FILE), 'let_in': self.authorized()}
+
+    def post_ask(self, sub, q):
+        if not os.path.exists(SESSIONS_FILE):
+            return 200, {'open': True}
+        device = device_kind(self.headers.get('User-Agent', ''))
+        rid = new_ask(device)
+        if not rid:
+            raise Refused(409, 'busy', 'The console is answering another device.')
+        return 200, {'id': rid, 'device': device}
+
+    def post_enter(self, sub, q):
+        rid = self.body_json().get('id')
+        with auth_lock:
+            if not os.path.exists(SESSIONS_FILE):
+                return 200, {'ok': True}
+            a = asks.get(rid) if isinstance(rid, str) else None
+            if not a or (not a['ok'] and time.monotonic() > a['until']):
+                raise Refused(403, 'expired', 'Not let in: the time is up or the console said no.')
+            if not a['ok']:
+                return 200, {'waiting': True}
+            del asks[rid]
+            log('page: a browser was let in from the console')
+            return 200, {'ok': True}, let_in()
+
+    def post_logout(self, sub, q):
+        t = self.token()
+        with auth_lock:
+            if t and os.path.exists(SESSIONS_FILE):
+                write_json(SESSIONS_FILE, [h for h in read_json(SESSIONS_FILE, []) if h != token_hash(t)])
+        return 200, {'ok': True}, {'Set-Cookie': f'{COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict'}
+
+    def post_protect(self, sub, q):
+        on = self.body_json().get('on')
+        if not isinstance(on, bool):
+            raise Refused(400, 'bad_request', 'Bad request.')
+        with auth_lock:
+            if not on:
+                if os.path.exists(SESSIONS_FILE):
+                    os.remove(SESSIONS_FILE)
+                log('page: open to the local network')
+                return 200, {'protected': False}
+            log("page: the console's OK needed")
+            return 200, {'protected': True}, let_in(keep=False)     # this browser stays in, the others need a code
 
     # GET /api/tree, PUT /api/roms/<file>, DELETE /api/roms/<file or empty folder>,
     # POST /api/folders/<folder>
@@ -860,18 +1167,92 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+# ---------------------------------------------------------------- the console's name on Windows (LLMNR)
+LLMNR_GROUP, LLMNR_PORT = '224.0.0.252', 5355
+
+
+def llmnr_answer(query, name, ip):
+    """The reply to an LLMNR query (RFC 4795, the DNS message format) if it asks for name's IPv4 address."""
+    if len(query) < 12:
+        return None
+    qid, flags, qdcount = struct.unpack('!3H', query[:6])
+    if flags & 0xF800 or qdcount != 1:              # a reply, another opcode, or not one question
+        return None
+    i, labels = 12, []
+    while i < len(query) and query[i]:
+        n = query[i]
+        if n & 0xC0:
+            return None
+        labels.append(query[i + 1:i + 1 + n])
+        i += 1 + n
+    i += 1
+    if i + 4 > len(query):
+        return None
+    qtype, qclass = struct.unpack('!2H', query[i:i + 4])
+    if [lab.lower() for lab in labels] != [name.lower().encode()] or qtype not in (1, 255) or qclass not in (1, 255):
+        return None
+    answer = b'\xc0\x0c' + struct.pack('!2HIH', 1, 1, 30, 4) + socket.inet_aton(ip)      # A, IN, 30 s
+    return struct.pack('!6H', qid, 0x8000, 1, 1, 0, 0) + query[12:i + 4] + answer
+
+
+def llmnr_loop():
+    """Answers Windows (and systemd-resolved) when they look for the console's name without .local."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, 1)       # replies stay on the local network
+    try:
+        sock.bind(('', LLMNR_PORT))
+    except OSError as e:
+        log('LLMNR off:', e)
+        return
+    sock.settimeout(30)
+    joined = None
+    while True:
+        ip = local_ip()
+        if ip and ip != joined:                     # (again) once the Wi-Fi is up or its address changes
+            try:
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                                socket.inet_aton(LLMNR_GROUP) + socket.inet_aton(ip))
+                joined = ip
+            except OSError as e:
+                joined = ip if e.errno == 98 else None      # EADDRINUSE: already a member
+        try:
+            query, sender = sock.recvfrom(512)
+        except socket.timeout:
+            continue
+        except OSError:
+            time.sleep(5)
+            continue
+        reply = ip and llmnr_answer(query, socket.gethostname(), ip)
+        if reply:
+            try:
+                sock.sendto(reply, sender)
+            except OSError:
+                pass
+
+
+web_port = 0
+
+
 def main():
+    global web_port
     load_state()
-    for target in (restore_backlight, saver, render_loop, button_loop):
+    for target in (restore_backlight, saver, render_loop, button_loop, llmnr_loop):
         threading.Thread(target=target, daemon=True).start()
     port = int(CFG['WEB_PORT'] or 0)
-    if port:
-        log('web page on port', port)
-        server = ThreadingHTTPServer(('', port), Handler)
-        server.daemon_threads = True
-        server.serve_forever()
-    else:
+    if not port:
         threading.Event().wait()
+    try:
+        server = ThreadingHTTPServer(('', port), Handler)
+    except OSError as e:                            # port 80 taken by another web server
+        if port == 8080:
+            raise
+        log(f'port {port}: {e}; using 8080')
+        port, server = 8080, ThreadingHTTPServer(('', 8080), Handler)
+    web_port = port
+    log('web page on port', port)
+    server.daemon_threads = True
+    server.serve_forever()
 
 
 if __name__ == '__main__':

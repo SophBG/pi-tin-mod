@@ -1,4 +1,5 @@
 #!/bin/bash
+# By SophBG: https://github.com/SophBG
 # Pi Tin on an Orange Pi Zero 2W: installs everything on a fresh Armbian (Debian, "current"
 # sunxi kernel; DietPi on the same kernel also works). Run from this folder, as your normal user:
 #
@@ -28,7 +29,7 @@ grep -aqiE 'zero ?2w' /proc/device-tree/model 2>/dev/null \
 
 step "packages"
 apt-get update
-apt-get install -y device-tree-compiler python3-spidev python3-evdev alsa-utils dosfstools \
+apt-get install -y device-tree-compiler python3-spidev python3-evdev alsa-utils dosfstools avahi-daemon \
 	retroarch libretro-core-info
 for p in libretro-nestopia libretro-gambatte libretro-mgba libretro-snes9x libretro-genesisplusgx \
 	libretro-beetle-pce-fast libretro-beetle-psx libretro-desmume; do
@@ -100,19 +101,17 @@ grep -qF " $MNT vfat " /etc/fstab \
 mountpoint -q "$MNT" || mount "$MNT"
 # One folder per console (the settings page sorts uploads into them by file type).
 for d in gb gbc gba nes snes megadrive mastersystem gamegear pcengine psx nds; do mkdir -p "$MNT/$d"; done
-OLD_PW=$(sed -n 's/^WEB_PASSWORD=//p' /etc/default/pitin 2>/dev/null || true)
 OLD_LANG=$(sed -n 's/^LANGUAGE=//p' /etc/default/pitin 2>/dev/null || true)
 cat >/etc/default/pitin <<EOF
 ROM_IMAGE=$IMG
 ROM_MOUNT=$MNT
 USB_MODE=auto
-WEB_PORT=8080
-# Password for the settings page (any user name); empty = no password.
-WEB_PASSWORD=$OLD_PW
+# Settings page port (80: no port in the address; 8080 is used if 80 is taken).
+WEB_PORT=80
 # Language of the on-screen messages and the hotkey list: en or fr; empty = the system's language.
 LANGUAGE=$OLD_LANG
 EOF
-# The hotkey list for SPECIAL + SELECT (a RetroArch overlay card), in the console's language.
+# The overlay cards (the hotkey list for SPECIAL + SELECT, the question for the settings page), in the console's language.
 L=$OLD_LANG
 case "$L" in
 	en|fr) ;;
@@ -120,6 +119,7 @@ case "$L" in
 esac
 install -d /etc/pitin/overlay
 install -m 644 "$HERE/overlay/help-card-$L.png" /etc/pitin/overlay/card.png
+install -m 644 "$HERE/overlay/ask-card-$L.png" /etc/pitin/overlay/ask.png
 install -m 644 "$HERE/overlay/pitin-menu.cfg" /etc/pitin/overlay/pitin-menu.cfg
 
 step "services"
@@ -134,4 +134,4 @@ systemctl enable pitin-retroarch.service pitin-usbd.service pitin-daemon.service
 step "done"
 echo "Reboot to load the overlay: sudo reboot"
 echo "After the reboot, check the hardware with: $HERE/check.sh"
-echo "LED and brightness settings page: http://$(hostname -I 2>/dev/null | cut -d' ' -f1):8080"
+echo "Settings page: http://$(hostname) (Windows), http://$(hostname).local or http://$(hostname -I 2>/dev/null | cut -d' ' -f1)"

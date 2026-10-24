@@ -1,8 +1,10 @@
 <!doctype html>
+<!-- Pi Tin settings page, by SophBG: https://github.com/SophBG -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="author" content="SophBG (https://github.com/SophBG)">
 <title>Pi Tin</title>
 <style>
 /* One column on a phone, two on a computer. The console drawing uses the real faceplate and LED
@@ -144,6 +146,22 @@ input[type=range] { width: 100%; accent-color: var(--ink); height: 28px; }
 dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: 15px; }
 dt { color: var(--muted); }
 dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+dd a { color: inherit; }
+dd.wide { grid-column: 1 / -1; min-width: 0; }
+dd .x { min-height: 0; padding: 0; margin: 0; text-decoration: underline; border-radius: 0; }
+dd .x:hover { background: none; color: var(--ink); }
+.rename { display: flex; flex-wrap: wrap; gap: 8px; }
+.rename input { flex: 1 1 200px; width: 0; min-width: 0; font: inherit; font-size: 16px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
+.rename span { display: flex; gap: 8px; }
+.rename .hint { flex: 1 1 100%; }
+
+/* letting a phone or computer in */
+.locked nav, .locked .panel { display: none !important; }
+#login { max-width: 420px; width: 100%; justify-self: center; }
+.ask-stack { display: grid; gap: 8px; }
+#ask-how { margin: 0; }
+#login .x { justify-self: start; padding: 4px 0; text-decoration: underline; }
+#login .x:hover { background: none; color: var(--ink); }
 dl.keys dt { font: 14px var(--font-num); color: var(--ink); white-space: nowrap; }
 dl.keys dd { color: var(--muted); }
 
@@ -167,6 +185,15 @@ dl.keys dd { color: var(--muted); }
       <span id="status" data-t="connecting"></span>
     </div>
   </header>
+  <section id="login" hidden>
+    <h2 data-t="login_title"></h2>
+    <div id="ask-wait" class="ask-stack" hidden>
+      <p id="ask-how"></p>
+      <p class="hint" data-t="login_wait"></p>
+    </div>
+    <p class="hint" id="ask-note" hidden></p>
+    <div class="tools" id="ask-again" hidden><button type="button" class="btn solid" id="ask-btn" data-t="ask_btn"></button></div>
+  </section>
   <nav role="tablist">
     <button role="tab" id="tab-leds" aria-controls="panel-leds" aria-selected="true" data-t="tab_leds"></button>
     <button role="tab" id="tab-games" aria-controls="panel-games" aria-selected="false" data-t="tab_games"></button>
@@ -288,6 +315,12 @@ dl.keys dd { color: var(--muted); }
       <dl id="info"></dl>
     </section>
     <section>
+      <h2 data-t="access_title"></h2>
+      <label class="switch"><input type="checkbox" id="protect" role="switch"><span data-t="access_ask"></span></label>
+      <p class="hint" id="access-state"></p>
+      <div class="tools" id="access-tools" hidden><button type="button" class="btn" id="logout" data-t="sign_out"></button></div>
+    </section>
+    <section>
       <h2 data-t="shortcuts"></h2>
       <p class="hint" data-t="shortcuts_how"></p>
       <dl class="keys" id="keys"></dl>
@@ -317,7 +350,7 @@ const T = {
     order_rec: "Tap the lights on the drawing one after the other. “Done” puts the others after them.",
     done: "Done", cancel: "Cancel",
     colour_each: "Colour of each light", colour_hint: "Tap a light on the drawing, then choose a colour. Chosen light: {name}.",
-    more_colours: "More colours…", same_everywhere: "Same colour on all", speed: "Speed", brightness: "Brightness", max_brightness: "Maximum",
+    more_colours: "More colours…", same_everywhere: "Same colour on all", i_by: "Software", speed: "Speed", brightness: "Brightness", max_brightness: "Maximum",
     follow_screen: "Auto brightness (follows the screen)", follow_now: "Now {now} %: the lights dim with the screen, up to the maximum.",
     storage: "Storage", free_of: "{free} free of {total}",
     drive_note: "Your games, in one folder per console. On the console, open them from the menu with “Load Content”.",
@@ -336,6 +369,15 @@ const T = {
     p_retroarch: "Restarting the game menu…", p_reboot: "Restarting…", p_poweroff: "Turning off…",
     about: "About this console", i_address: "This page", i_name: "Console name", i_menu: "Game menu", i_running: "Running", i_stopped: "Stopped",
     i_temp: "Temperature", i_up: "Switched on for", i_free: "Free space", i_away: "Plugged into a computer", i_none: "No Wi-Fi", unknown: "–",
+    rename: "Change", save: "Save", rename_as: "On the network: {name}",
+    login_title: "Let this device in", login_how: "The console is asking whether to let this {device} in. Hold A on the console for a second to say yes; B says no.",
+    login_wait: "Waiting for the console…", login_idle: "This page needs the console's OK.",
+    login_expired: "Not let in: the time is up or the console said no.", ask_btn: "Ask the console",
+    devices: {iphone: "iPhone", ipad: "iPad", android: "Android device", windows: "Windows PC", mac: "Mac", chromebook: "Chromebook", linux: "Linux PC", other: "device"},
+    access_title: "Access to this page", access_ask: "New devices need the console's OK",
+    access_off: "Anyone on the same Wi-Fi can open this page.",
+    access_on: "When a new phone or computer opens this page, the console pauses the game and asks: hold A to let it in, B says no.",
+    sign_out: "Sign out on this device",
     shortcuts: "Shortcuts", shortcuts_how: "Hold SPECIAL and press:",
     k_menu: "Game menu", k_state: "Load (hold 1 s) / save the game", k_slot: "Previous / next save", k_vol: "Volume up / down", k_reset: "Restart the game (hold 1 s)",
     k_quit: "Quit the game, saved (hold 1 s)", k_bright: "Screen darker / brighter", k_leds: "Lights on / off", k_fx: "Next light effect", k_quick: "List of shortcuts on the screen (they work there without SPECIAL)",
@@ -348,7 +390,8 @@ const T = {
           name_needed: "Please type a name.", name_taken: "Something with that name is already there.", exists: "A file with that name is already there.",
           too_large: "This file is too big (over 4 GB).", no_space: "There isn't enough free space.", not_empty: "The folder isn't empty. Delete what's inside first.",
           gone: "It was already deleted.", no_volume: "The volume can be changed once a game or the menu has played a sound.",
-          password: "This page needs a password.", failed: "Something went wrong. Try again.", not_found: "Not found.", bad_request: "Something went wrong. Try again."},
+          locked: "This page needs the console's OK.", busy: "The console is already answering another device. Try again in a minute.", failed: "Something went wrong. Try again.", not_found: "Not found.", bad_request: "Something went wrong. Try again.",
+          bad_hostname: "Use letters (a–z), numbers and hyphens (-)."},
   },
   fr: {
     connecting: "Connexion…", connected: "Connecté", saved: "Enregistré", unreachable: "Impossible de joindre la Pi Tin. Est-elle sur le même Wi-Fi ?",
@@ -369,7 +412,7 @@ const T = {
     order_rec: "Touchez les lumières sur le dessin l'une après l'autre. « Terminé » place les autres à la suite.",
     done: "Terminé", cancel: "Annuler",
     colour_each: "Couleur de chaque lumière", colour_hint: "Touchez une lumière sur le dessin, puis choisissez une couleur. Lumière choisie : {name}.",
-    more_colours: "Plus de couleurs…", same_everywhere: "Même couleur partout", speed: "Vitesse", brightness: "Luminosité", max_brightness: "Maximum",
+    more_colours: "Plus de couleurs…", same_everywhere: "Même couleur partout", i_by: "Logiciel", speed: "Vitesse", brightness: "Luminosité", max_brightness: "Maximum",
     follow_screen: "Luminosité automatique (suit l'écran)", follow_now: "Actuellement {now} % : les lumières baissent avec l'écran, jusqu'au maximum.",
     storage: "Stockage", free_of: "{free} libres sur {total}",
     drive_note: "Vos jeux, avec un dossier par console. Sur la console, ouvrez-les depuis le menu avec « Load Content ».",
@@ -388,6 +431,15 @@ const T = {
     p_retroarch: "Redémarrage du menu…", p_reboot: "Redémarrage…", p_poweroff: "Extinction…",
     about: "À propos de cette console", i_address: "Cette page", i_name: "Nom de la console", i_menu: "Menu des jeux", i_running: "En marche", i_stopped: "Arrêté",
     i_temp: "Température", i_up: "Allumée depuis", i_free: "Espace libre", i_away: "Branchée à un ordinateur", i_none: "Pas de Wi-Fi", unknown: "–",
+    rename: "Modifier", save: "Enregistrer", rename_as: "Sur le réseau : {name}",
+    login_title: "Autoriser cet appareil", login_how: "La console demande s'il faut autoriser cet appareil ({device}). Maintenez A sur la console pendant une seconde pour accepter ; B refuse.",
+    login_wait: "En attente de la console…", login_idle: "Cette page a besoin de l'accord de la console.",
+    login_expired: "Pas autorisé : le temps est écoulé ou la console a refusé.", ask_btn: "Demander à la console",
+    devices: {iphone: "iPhone", ipad: "iPad", android: "Android", windows: "PC Windows", mac: "Mac", chromebook: "Chromebook", linux: "PC Linux", other: "appareil"},
+    access_title: "Accès à cette page", access_ask: "Les nouveaux appareils ont besoin de l'accord de la console",
+    access_off: "Tout le monde sur le même Wi-Fi peut ouvrir cette page.",
+    access_on: "Quand un nouveau téléphone ou ordinateur ouvre cette page, la console met le jeu en pause et demande : maintenir A pour l'autoriser, B refuse.",
+    sign_out: "Se déconnecter sur cet appareil",
     shortcuts: "Raccourcis", shortcuts_how: "Maintenez SPECIAL et appuyez sur :",
     k_menu: "Menu des jeux", k_state: "Charger (maintenir 1 s) / sauvegarder la partie", k_slot: "Sauvegarde précédente / suivante", k_vol: "Volume plus / moins", k_reset: "Recommencer le jeu (maintenir 1 s)",
     k_quit: "Quitter le jeu, sauvegardé (maintenir 1 s)", k_bright: "Écran plus sombre / plus clair", k_leds: "Lumières allumées / éteintes", k_fx: "Effet de lumière suivant", k_quick: "Liste des raccourcis à l'écran (ils y marchent sans SPECIAL)",
@@ -400,7 +452,8 @@ const T = {
           name_needed: "Écrivez un nom.", name_taken: "Il y a déjà quelque chose avec ce nom.", exists: "Un fichier avec ce nom est déjà là.",
           too_large: "Ce fichier est trop gros (plus de 4 Go).", no_space: "Il n'y a pas assez de place.", not_empty: "Le dossier n'est pas vide. Supprimez d'abord ce qu'il contient.",
           gone: "C'était déjà supprimé.", no_volume: "Le volume se règle dès qu'un jeu ou le menu a joué un son.",
-          password: "Cette page demande un mot de passe.", failed: "Un problème est survenu. Réessayez.", not_found: "Introuvable.", bad_request: "Un problème est survenu. Réessayez."},
+          locked: "Cette page a besoin de l'accord de la console.", busy: "La console répond déjà à un autre appareil. Réessayez dans une minute.", failed: "Un problème est survenu. Réessayez.", not_found: "Introuvable.", bad_request: "Un problème est survenu. Réessayez.",
+          bad_hostname: "Utilisez des lettres (a–z), des chiffres et des tirets (-)."},
   },
 };
 // The browser's language decides: French if it comes before English in the browser's list, otherwise English.
@@ -418,12 +471,13 @@ const errText = e => (e && e.body && T[lang].err[e.body.code]) || (e && e.status
 const $ = id => document.getElementById(id);
 const api = (path, opts = {}) => fetch(path, opts).then(async r => {
   const body = await r.json().catch(() => ({}));
+  if (r.status === 401 && body.code === "locked") lock(true);
   if (!r.ok) throw Object.assign(new Error(body.error || "Request failed (" + r.status + ")."), {status: r.status, body});
   return body;
 });
 const post = (path, data) => api(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
-let statusKey = "connecting", statusBad = false;
-function setStatus(key, bad, raw) { statusKey = key; statusBad = !!bad; $("status").textContent = raw || t(key); $("status").className = bad ? "bad" : ""; }
+let statusKey = "connecting", statusBad = false, locked = false;
+function setStatus(key, bad, raw) { if (locked) return; statusKey = key; statusBad = !!bad; $("status").textContent = raw || t(key); $("status").className = bad ? "bad" : ""; }
 function fmtSize(n) {
   const [k, m, g] = T[lang].units, nf = d => new Intl.NumberFormat(lang, {maximumFractionDigits: d, minimumFractionDigits: d});
   return n >= 1e9 ? nf(1).format(n / 1e9) + " " + g : n >= 1e6 ? nf(n >= 1e8 ? 0 : 1).format(n / 1e6) + " " + m : Math.max(1, Math.round(n / 1e3)) + " " + k;
@@ -560,7 +614,7 @@ function send(ch) {
   }, 80);
 }
 function poll() {
-  if (recording || Date.now() - lastInput < 1500 || Object.keys(pending).length) return;
+  if (locked || recording || Date.now() - lastInput < 1500 || Object.keys(pending).length) return;
   api("/api/state").then(s => { show(s); if (statusKey !== "saved") setStatus("connected"); })
     .catch(e => setStatus("", true, errText(e)));
 }
@@ -773,6 +827,7 @@ function upload(file, dir, replace) {
   xhr.upload.onprogress = e => { if (e.lengthComputable) bar.value = e.loaded / e.total; };
   xhr.onload = () => {
     let body = {}; try { body = JSON.parse(xhr.responseText); } catch (e) {}
+    if (xhr.status === 401) lock(true);
     if (xhr.status === 200) { say(t("up_done"), "good"); fresh.add(join(dir, file.name)); expanded.add(dir); loadTree(); }
     else if (body.exists) askReplace();
     else say(T[lang].err[body.code] || body.error || t("up_failed"), "bad");
@@ -796,23 +851,75 @@ function fmtUptime(s) {
   const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
   return (d ? d + " " + T[lang].day + " " : "") + (h ? h + " h " : "") + m + " min";
 }
+// The console's name: "Change" opens a field in its place. The name becomes one network label (a-z, 0-9, -).
+const hostSlug = s => s.normalize("NFD").replace(/[̀-ͯ'’]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+/, "").slice(0, 63).replace(/-+$/, "");
+const renameBox = Object.assign(document.createElement("div"), {className: "rename"});
+renameBox.innerHTML = '<input autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="63">' +
+  '<span><button type="button" class="btn solid"></button><button type="button" class="btn"></button></span><p class="hint" hidden></p>';
+const [nameIn, [nameSave, nameCancel], nameAs] = [...renameBox.children].map(e => e.tagName === "SPAN" ? [...e.children] : e);
+let renaming = false;
+function nameHint() {
+  const raw = nameIn.value.trim(), s = hostSlug(raw);
+  nameAs.hidden = !raw || s === raw;
+  nameAs.textContent = s ? t("rename_as", {name: s}) : T[lang].err.bad_hostname;
+}
+function rename(on) { renaming = on; if (on) { nameIn.value = info.hostname; nameHint(); } renderInfo(); if (on) { nameIn.focus(); nameIn.select(); } }
+function saveName() {
+  const name = hostSlug(nameIn.value);
+  if (!name) return setStatus("", true, T[lang].err.bad_hostname);
+  if (name === info.hostname) return rename(false);
+  post("/api/hostname", {hostname: name}).then(i => { info = i; rename(false); setStatus("saved"); probe(i).then(() => { if (!renaming && info === i) renderInfo(); }); }).catch(e => setStatus("", true, errText(e)));
+}
+nameIn.oninput = nameHint;
+nameIn.onkeydown = e => { if (e.key === "Enter") saveName(); if (e.key === "Escape") rename(false); };
+nameSave.onclick = saveName;
+nameCancel.onclick = () => rename(false);
+function nameCell(i) {
+  if (renaming) { nameSave.textContent = t("save"); nameCancel.textContent = t("cancel"); nameIn.setAttribute("aria-label", t("i_name")); nameHint(); return [renameBox]; }
+  const b = Object.assign(document.createElement("button"), {type: "button", className: "x", textContent: t("rename")});
+  b.onclick = () => rename(true);
+  return [i.hostname, " ", b];
+}
+// The page's addresses that work from this device: the name alone (Windows, and routers that know the names),
+// else name.local (most phones and computers); then the IP, which always works.
+const reachable = {[location.origin]: true};
+const nameUrls = i => { const port = i.port === 80 ? "" : ":" + i.port; return [`http://${i.hostname}${port}`, `http://${i.hostname}.local${port}`]; };
+function probe(i) {
+  return Promise.all(nameUrls(i).filter(u => !reachable[u]).map(u => {
+    const c = new AbortController(), tm = setTimeout(() => c.abort(), 3000);
+    return fetch(u + "/ping", {mode: "no-cors", cache: "no-store", signal: c.signal})
+      .then(() => { reachable[u] = true; }, () => {}).finally(() => clearTimeout(tm));
+  }));
+}
 function renderInfo() {
   const dl = $("info"); dl.innerHTML = "";
   if (!info) return;
   const i = info, nf = new Intl.NumberFormat(lang, {maximumFractionDigits: 1, minimumFractionDigits: 1});
+  const addr = [...nameUrls(i).filter(u => reachable[u]).slice(0, 1), ...(i.ip ? [`http://${i.ip}${i.port === 80 ? "" : ":" + i.port}`] : [])];
   const rows = [
-    ["i_address", i.ip ? `http://${i.ip}${i.port === 80 ? "" : ":" + i.port}` : t("i_none")],
-    ["i_name", i.hostname],
+    ["i_address", addr.length ? addr.flatMap((a, k) => k ? [document.createElement("br"), a] : [a]) : t("i_none")],
+    ["i_name", nameCell(i)],
     ["i_menu", i.retroarch === "active" ? t("i_running") : t("i_stopped")],
     ["i_temp", i.temp_c != null ? nf.format(i.temp_c) + " °C" : t("unknown")],
     ["i_up", i.uptime_s != null ? fmtUptime(i.uptime_s) : t("unknown")],
     ["i_free", i.drive && i.drive.mounted ? fmtSize(i.drive.free) : t("i_away")],
   ];
-  for (const [k, v] of rows) dl.append(Object.assign(document.createElement("dt"), {textContent: t(k)}), Object.assign(document.createElement("dd"), {textContent: v}));
+  for (const [k, v] of rows) {
+    const dd = document.createElement("dd"); dd.append(...[].concat(v));
+    if (dd.contains(renameBox)) dd.className = "wide";         // the field under its label, full width
+    dl.append(Object.assign(document.createElement("dt"), {textContent: t(k)}), dd);
+  }
+  // Credit
+  const by = Object.assign(document.createElement("a"), {href: "https://github.com/SophBG", target: "_blank", rel: "noopener", textContent: "@SophBG"});
+  const dd = document.createElement("dd"); dd.append(by);
+  dl.append(Object.assign(document.createElement("dt"), {textContent: t("i_by")}), dd);
 }
 function loadInfo() {
   api("/api/info").then(i => {
-    info = i; renderInfo();
+    info = i; if (!renaming) renderInfo();             // not while the name is being typed
+    renderAccess(i.protected);
+    probe(i).then(() => { if (!renaming && info === i) renderInfo(); });
     const hasVol = i.volume != null;
     $("volume").disabled = !hasVol;
     if (hasVol && Date.now() - volInput > 1500) { $("volume").value = i.volume; $("vv").textContent = i.volume + " %"; }
@@ -837,6 +944,54 @@ function renderKeys() {
   for (const [k, v] of KEYS) dl.append(Object.assign(document.createElement("dt"), {textContent: k}), Object.assign(document.createElement("dd"), {textContent: t(v)}));
 }
 
+// ------------------------------------------------------------------ letting a phone or computer in
+// With the console's OK switched on, a phone or computer that isn't let in yet gets 401 and the page shows a card
+// instead of the tabs, and the console pauses the game and asks (hold A: yes, B: no; pitin-daemon). The page asks
+// every second whether it was let in.
+let asked = null, askTimer = null;
+function lock(ask) {
+  if (locked) return;
+  locked = true; document.body.classList.add("locked"); $("status").textContent = ""; $("login").hidden = false;
+  if (ask) askConsole(); else askState("idle");
+}
+function unlock() {
+  clearInterval(askTimer); asked = null;
+  locked = false; document.body.classList.remove("locked"); $("login").hidden = true;
+  setStatus("connected"); poll(); openTab(location.hash.slice(1));
+}
+function askState(state, text) {
+  $("ask-wait").hidden = state !== "waiting";
+  $("ask-again").hidden = state === "waiting";
+  $("ask-note").hidden = state === "waiting";
+  $("ask-note").textContent = text || t(state === "expired" ? "login_expired" : "login_idle");
+  $("ask-note").className = state === "expired" ? "hint bad" : "hint";
+}
+function askConsole() {
+  clearInterval(askTimer);
+  post("/api/ask", {}).then(r => {
+    if (r.open) return unlock();
+    asked = r; askHow(r.device); askState("waiting");
+    askTimer = setInterval(() => post("/api/enter", {id: r.id}).then(e => { if (e.ok) unlock(); })
+      .catch(err => { clearInterval(askTimer); asked = null; askState("expired", err.body && err.body.code === "expired" ? "" : errText(err)); }), 1000);
+  }).catch(err => askState("expired", errText(err)));
+}
+// The device's kind as the console names it (from the browser's user agent), so both say the same.
+function askHow(device) {
+  const name = T[lang].devices[device] || T[lang].devices.other;
+  $("ask-how").textContent = t("login_how", {device: name}).replace(" (" + T[lang].devices.other + ")", "");
+}
+$("ask-btn").onclick = askConsole;
+
+function renderAccess(on) {
+  $("protect").checked = on;
+  $("access-state").textContent = t(on ? "access_on" : "access_off");
+  $("access-tools").hidden = !on;
+}
+$("protect").onchange = e => post("/api/protect", {on: e.target.checked})
+  .then(r => { if (info) info.protected = r.protected; renderAccess(r.protected); setStatus("saved"); })
+  .catch(err => { e.target.checked = !e.target.checked; setStatus("", true, errText(err)); });
+$("logout").onclick = () => post("/api/logout", {}).then(() => lock(false));
+
 // ------------------------------------------------------------------ language
 function applyLang() {
   document.documentElement.lang = lang;
@@ -845,13 +1000,14 @@ function applyLang() {
   $("leds_on").setAttribute("aria-label", t("lights_on"));
   $("color").setAttribute("aria-label", t("more_colours"));
   if (statusKey) setStatus(statusKey, statusBad);
-  show(st); renderDest(); renderTree(); if (lastDrive) showDrive(lastDrive); renderInfo(); renderKeys();
+  show(st); renderDest(); renderTree(); if (lastDrive) showDrive(lastDrive); renderInfo(); renderKeys(); if (info) renderAccess(info.protected);
+  if (asked) askHow(asked.device);
 }
 window.addEventListener("languagechange", () => { lang = browserLang(); applyLang(); });
 
 applyLang();
 poll(); setInterval(poll, 5000);
-setInterval(() => { if (!$("panel-system").hidden) loadInfo(); }, 10000);
+setInterval(() => { if (!locked && !$("panel-system").hidden) loadInfo(); }, 10000);
 openTab(location.hash.slice(1));
 window.addEventListener("hashchange", () => openTab(location.hash.slice(1)));
 </script>

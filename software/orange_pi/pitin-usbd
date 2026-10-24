@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Pi Tin USB-drive mode for the Orange Pi Zero 2W (runs as root, pitin-usbd.service).
+"""Pi Tin USB-drive mode for the Orange Pi Zero 2W (runs as root, pitin-usbd.service). By SophBG:
+https://github.com/SophBG
 
 When a USB cable is plugged into the Pi Tin (header pin 8, reported by the overlay as
 SW_USB_INSERT on the "Pi Tin System" input device), the board offers an empty USB drive.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Pi Tin RGB LEDs (10x WS2812B-2020) through the 74AHCT1G125 gate on header pin 21.
+"""Pi Tin RGB LEDs (10x WS2812B-2020) through the 74AHCT1G125 gate on header pin 21. By SophBG:
+https://github.com/SophBG
 
 The buffer only passes MOSI while the second chip select (pin 21) is low, so the display
 on the first chip select never reaches the LEDs. On the Orange Pi the LEDs are

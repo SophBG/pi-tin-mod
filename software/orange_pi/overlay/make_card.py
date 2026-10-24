@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Draws the hotkey list for SPECIAL + SELECT next to this file: help-card-en.png and help-card-fr.png.
+"""Draws the overlay cards next to this file: the hotkey list for SPECIAL + SELECT (help-card-en.png,
+help-card-fr.png) and the question shown when a phone or computer asks to open the settings page (ask-card-en.png,
+ask-card-fr.png).
 
 The card is only a picture: RetroArch shows it over the game while it is open. To change it, edit CARDS or
 the colours below and run:  python3 make_card.py   (needs Pillow and the DejaVu fonts; on Debian or Ubuntu:
@@ -16,24 +18,32 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FONTS = '/usr/share/fonts/truetype/dejavu/'
 W, H = 320, 240                    # the screen
 
-# Each card: title (with buttons in front of it), the buttons that close it, two columns of (buttons, what they
-# do), an optional note under them, the label size and where the second column starts. A pair is less / more, or
-# previous / next.
+# Each card: title (with buttons in front of it), the buttons that close it (optional), columns of (buttons, what
+# they do), an optional note under them, the label size and where the second column starts. A pair is less / more,
+# or previous / next.
 CARDS = {
     'help': {
         'en': {'title': (['SPECIAL'], '+  SHORTCUTS'), 'close': (['SELECT'], 'close'),
                'cols': [('GAME', [(['X'], 'RetroArch menu'), (['L1', 'R1'], 'Load* / save'), (['◀', '▶'], 'Save slot'),
                                   (['B'], 'Restart*'), (['START'], 'Quit*')]),
                         ('CONSOLE', [(['▲', '▼'], 'Volume'), (['L2', 'R2'], 'Screen brightness'), (['Y'], 'LEDs on / off'),
-                                     (['A'], 'Next LED effect'), (['SELECT'], 'This list')])],
-               'note': 'Here: press without SPECIAL.     * hold for a second'},
+                                     (['A'], 'LED effect')])],
+               'note': 'Here, no need for SPECIAL.   * hold 1 s'},
         'fr': {'title': (['SPECIAL'], '+  RACCOURCIS'), 'close': (['SELECT'], 'fermer'),
                'cols': [('JEU', [(['X'], 'Menu RetroArch'), (['L1', 'R1'], 'Charger* / sauver'), (['◀', '▶'], 'Emplacement'),
                                  (['B'], 'Recommencer*'), (['START'], 'Quitter*')]),
-                        ('CONSOLE', [(['▲', '▼'], 'Volume'), (['L2', 'R2'], 'Luminosité écran'), (['Y'], 'LEDs marche / arrêt'),
-                                     (['A'], 'Effet LED suivant'), (['SELECT'], 'Cette liste')])],
-               'note': 'Ici : appuyez sans SPECIAL.     * maintenir une seconde'},
+                        ('CONSOLE', [(['▲', '▼'], 'Volume'), (['L2', 'R2'], 'Luminosité écran'), (['Y'], 'LEDs on / off'),
+                                     (['A'], 'Effet LED')])],
+               'note': 'Ici, pas besoin de SPECIAL.   * maintenir 1 s'},
         'size': 10, 'col2': 140},
+    'ask': {
+        'en': {'title': ([], 'SETTINGS PAGE'),
+               'cols': [('A PHONE OR COMPUTER WANTS TO OPEN IT', [(['A'], 'Hold 1 s: let it in'), (['B'], 'No')])],
+               'note': 'Which one: in the message at the bottom.'},
+        'fr': {'title': ([], 'PAGE DE RÉGLAGES'),
+               'cols': [("UN TÉLÉPHONE OU ORDINATEUR VEUT L'OUVRIR", [(['A'], 'Maintenir 1 s : autoriser'), (['B'], 'Non')])],
+               'note': 'Lequel : dans le message en bas.'},
+        'size': 11, 'col2': 300},
 }
 
 # Colours (red, green, blue, opacity 0-255): the settings page's dark theme.
@@ -67,7 +77,7 @@ def keys(d, x, y, labels):
     return x
 
 
-for name, card in CARDS.items():                # one card for now; more can be added the same way
+for name, card in CARDS.items():
     for lang in ('en', 'fr'):
         t, size = card[lang], card['size']
         im = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
@@ -77,10 +87,11 @@ for name, card in CARDS.items():                # one card for now; more can be 
         d.rounded_rectangle([x0, y0, x1, y1], radius=9, fill=CARD, outline=LINE, width=1)
         tx = keys(d, x0 + 12, y0 + 8, t['title'][0])
         d.text((tx + (3 if t['title'][0] else 0), y0 + 16), t['title'][1], font=bold(13), fill=INK, anchor='lm')
-        ck, ctext = t['close']                                      # "SELECT close", right of the title
-        fx = x1 - 12 - d.textlength(ctext, font=reg(11))
-        d.text((fx, y0 + 16), ctext, font=reg(11), fill=MUTED, anchor='lm')
-        keys(d, fx - keys(scratch, 0, 0, ck) - 1, y0 + 8, ck)
+        if 'close' in t:                                            # "SELECT close", right of the title
+            ck, ctext = t['close']
+            fx = x1 - 12 - d.textlength(ctext, font=reg(11))
+            d.text((fx, y0 + 16), ctext, font=reg(11), fill=MUTED, anchor='lm')
+            keys(d, fx - keys(scratch, 0, 0, ck) - 1, y0 + 8, ck)
         for c, (head, col) in enumerate(t['cols']):
             cx = x0 + 12 + c * card['col2']
             d.text((cx, y0 + 34), head, font=bold(9), fill=MUTED, anchor='lm')

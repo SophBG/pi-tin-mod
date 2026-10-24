@@ -1,4 +1,5 @@
 #!/bin/bash
+# By SophBG: https://github.com/SophBG
 # Pi Tin on an Orange Pi Zero 2W: checks that each part of the overlay came up after install.sh
 # and a reboot. With --test it also dims the screen, lights the LEDs, plays a sound and echoes
 # button presses.
@@ -33,10 +34,11 @@ ls /sys/bus/platform/drivers/poweroff-gpio/ 2>/dev/null | grep -q pitin && ok "p
 
 ls /sys/class/udc/ 2>/dev/null | grep -q . && ok "USB device controller $(ls /sys/class/udc | head -n 1)" || bad "no USB device controller (USB-drive mode)"
 mountpoint -q "${ROM_MOUNT:-/nonexistent}" && ok "ROM drive mounted on $ROM_MOUNT" || bad "ROM drive not mounted"
-for s in pitin-retroarch pitin-usbd pitin-daemon; do
+for s in pitin-retroarch pitin-usbd pitin-daemon avahi-daemon; do
 	systemctl is-active -q "$s" && ok "service $s" || bad "service $s: journalctl -u $s"
 done
-echo "  settings page: http://$(hostname -I 2>/dev/null | cut -d' ' -f1):${WEB_PORT:-8080}"
+P=${WEB_PORT:-80}; [ "$P" = 80 ] && P= || P=:$P
+echo "  settings page: http://$(hostname)$P (Windows), http://$(hostname).local$P or http://$(hostname -I 2>/dev/null | cut -d' ' -f1)$P"
 
 if [ "${1:-}" = --test ]; then
 	[ "$(id -u)" = 0 ] || { echo "--test needs sudo"; exit 1; }
